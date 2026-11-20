@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "GG-O · Văn hóa Hàn · Niềm vui · Cộng đồng",
+  "short_name": "GG-O",
+  "description": "Thể hiện gu riêng, trò chuyện ẩn danh. Bản thử nghiệm tiếng Việt.",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8f8f4",
+  "theme_color": "#101010",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

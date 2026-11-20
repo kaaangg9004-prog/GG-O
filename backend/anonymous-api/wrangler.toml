@@ -1,0 +1,8 @@
+name = "ggo-anonymous-api"
+main = "src/index.ts"
+compatibility_date = "2026-11-16"
+# Set SUPABASE_URL, SUPABASE_ANON_KEY and ALLOWED_ORIGINS as Worker variables.
+# Set SUPABASE_SERVICE_ROLE_KEY with `wrangler secret put`; never commit it.
+# ALLOWED_ORIGINS must list exact website origins, separated by commas.
+# Set VIEW_HASH_SECRET with `wrangler secret put` (32+ random characters).
+# It is used only by POST /view; no raw view IP is stored or returned.

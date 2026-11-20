@@ -1,0 +1,13 @@
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+*.tsbuildinfo
+coverage/
+
+# Local Worker secrets and deployment state
+.dev.vars*
+.wrangler/
+
+supabase/.temp/
