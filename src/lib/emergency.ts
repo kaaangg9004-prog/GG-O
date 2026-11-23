@@ -6,7 +6,7 @@ export const emergencyPrivacyNotice={
   items:'이름, 연락처, 이메일 주소, 직접 입력한 현위치, 요청 내용',
   retention:'처리 완료 후 30일 이내 파기하며, 접수일로부터 최대 90일까지만 보관합니다.',
   refusal:'동의를 거부할 수 있으나, 동의하지 않으면 도움 요청을 보낼 수 없습니다.',
-  rights:'동의 철회·열람·삭제 요청: contact.us.ggo@gmail.com',
+  rights:'동의 철회·열람·삭제 요청: contact.US.GGO@gmail.com',
 } as const;
 export interface EmergencyDraft {
   name:string; phone:string; email:string; location:string; body:string;

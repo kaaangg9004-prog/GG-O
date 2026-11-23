@@ -24,12 +24,12 @@ const titles = {
 function linkedText(value: string): ReactNode {
   return value
     .split(
-      /(https:\/\/policies\.google\.com\/technologies\/ads|https:\/\/gg-o\.com|contact\.us\.ggo@gmail\.com)/g,
+      /(https:\/\/policies\.google\.com\/technologies\/ads|https:\/\/www\.gg-o\.net|contact\.US\.GGO@gmail\.com)/g,
     )
     .map((part, index) =>
-      part.startsWith("https://") || part === "contact.us.ggo@gmail.com" ? (
-        <a key={index} href={part.includes("@") ? `mailto:${part}` : part}>
-          {part}
+      part.startsWith("https://") || part === "contact.US.GGO@gmail.com" ? (
+        <a key={index} href={part.includes("@") ? `mailto:${part === "https://www.gg-o.net" ? "GG-O.net" : part}` : part}>
+          {part === "https://www.gg-o.net" ? "GG-O.net" : part}
         </a>
       ) : (
         part
