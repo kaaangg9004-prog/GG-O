@@ -22,7 +22,12 @@ export default function DemoAccess(){
     let active=true;
     const client=getSupabase();
     clearDemoLogin();
-    const url=new URL(window.location.href);if(url.searchParams.get('login')==='1'){setLoginRequested(true);url.searchParams.delete('login');window.history.replaceState(null,'',url.pathname+url.search+url.hash);}
+    const url=new URL(window.location.href);
+    if (url.searchParams.has('code') || url.searchParams.has('error_code')) {
+      window.location.replace('/auth/callback/' + url.search);
+      return;
+    }
+    if(url.searchParams.get('login')==='1'){setLoginRequested(true);url.searchParams.delete('login');window.history.replaceState(null,'',url.pathname+url.search+url.hash);}
     if(!client)setChecking(false);
     else client.auth.getUser().then(async({data})=>{
       if(!active||!data.user)return;

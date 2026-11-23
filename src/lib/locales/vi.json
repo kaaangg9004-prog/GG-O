@@ -1,4 +1,5 @@
 {
+  "최신 커뮤니티 글": "Bài viết cộng đồng mới nhất",
   "내 정보": "Thông tin của tôi",
   "사이트 관리 탭에 새로운 알림이 있습니다.": "Có thông báo mới trong mục Quản lý trang.",
   "사이트 관리 열기": "Mở Quản lý trang",
@@ -1285,7 +1286,7 @@
   "서버에 저장했습니다.": "Đã lưu trên máy chủ.",
   "Google 계정으로 로그인하면 다른 기기에서도 같은 계정으로 활동을 이어갈 수 있습니다.": "Đăng nhập bằng Google để tiếp tục sử dụng cùng tài khoản trên các thiết bị khác.",
   "회원 연결 설정 중입니다. 로그인이 열리면 이용할 수 있습니다. 테스트 계정은 더 이상 사용하지 않습니다.": "Tính năng đăng nhập thành viên đang được chuẩn bị.",
-  "서버 연결 테스트 · 회원 활동은 서버에 저장됩니다.": "Hoạt động của thành viên được lưu trên máy chủ.",
+  "회원 활동은 서버에 저장됩니다.": "Hoạt động của thành viên được lưu trên máy chủ.",
   "IP 미수집": "Không thu thập IP",
   "작성 요청이 많습니다. 잠시 후 다시 시도해 주세요.": "Bạn gửi quá nhiều yêu cầu. Vui lòng thử lại sau ít phút.",
   "테스트 계정은 더 이상 사용하지 않습니다.": "Vui lòng đăng nhập bằng tài khoản mạng xã hội.",

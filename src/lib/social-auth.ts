@@ -7,6 +7,25 @@ export type SocialProvider='google'|'facebook';
 export const OAUTH_PENDING_KEY='ggo-oauth-pending-v1';
 export const providerName=(provider:SocialProvider)=>provider==='google'?'구글':'페이스북';
 type OAuthClient={auth:Pick<SupabaseClient['auth'],'signInWithOAuth'>};
+
+// Consume a fresh PKCE code before reading the account. The session is persisted
+// by Supabase before the promise resolves and before we navigate away.
+export async function resolveOAuthUser(
+  client: {auth: Pick<SupabaseClient['auth'], 'exchangeCodeForSession' | 'getUser'>},
+  params: URLSearchParams,
+) {
+  if (params.has('error') || params.has('error_code')) {
+    throw new Error('소셜 로그인이 취소되었거나 승인되지 않았습니다. 다시 시도해 주세요.');
+  }
+  const code = params.get('code');
+  const result = code
+    ? await client.auth.exchangeCodeForSession(code)
+    : await client.auth.getUser();
+  if (result.error || !result.data.user) {
+    throw new Error('로그인 정보를 확인하지 못했습니다. 로그인 화면에서 다시 시도해 주세요.');
+  }
+  return result.data.user;
+}
 export function pendingSocialSignup() {
   try {
     const raw=sessionStorage.getItem(OAUTH_PENDING_KEY);if(!raw)return null;
