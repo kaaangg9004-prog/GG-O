@@ -28,7 +28,7 @@ function linkedText(value: string): ReactNode {
     )
     .map((part, index) =>
       part.startsWith("https://") || part === "contact.US.GGO@gmail.com" ? (
-        <a key={index} href={part.includes("@") ? `mailto:${part === "https://www.gg-o.net" ? "GG-O.net" : part}` : part}>
+        <a key={index} href={part.includes("@") ? `mailto:${part}` : part}>
           {part === "https://www.gg-o.net" ? "GG-O.net" : part}
         </a>
       ) : (
