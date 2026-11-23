@@ -1,4 +1,5 @@
 {
+  "최신 커뮤니티 글": "Latest community posts",
   "내 정보": "My info",
   "사이트 관리 탭에 새로운 알림이 있습니다.": "There are new notifications in Site Management.",
   "사이트 관리 열기": "Open Site Management",
@@ -1285,7 +1286,7 @@
   "서버에 저장했습니다.": "Saved to the server.",
   "Google 계정으로 로그인하면 다른 기기에서도 같은 계정으로 활동을 이어갈 수 있습니다.": "Sign in with Google to continue with the same account on other devices.",
   "회원 연결 설정 중입니다. 로그인이 열리면 이용할 수 있습니다. 테스트 계정은 더 이상 사용하지 않습니다.": "Member sign-in is being set up.",
-  "서버 연결 테스트 · 회원 활동은 서버에 저장됩니다.": "Member activity is saved on the server.",
+  "회원 활동은 서버에 저장됩니다.": "Member activity is saved on the server.",
   "IP 미수집": "IP not collected",
   "작성 요청이 많습니다. 잠시 후 다시 시도해 주세요.": "Too many requests. Please try again shortly.",
   "테스트 계정은 더 이상 사용하지 않습니다.": "Please sign in with your social account.",
