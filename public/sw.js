@@ -1,5 +1,5 @@
-const CACHE = 'ggo-static-v3-three-languages';
-const SHELL = ['/', '/offline.html', '/icon.svg', '/manifest.webmanifest'];
+const CACHE = 'ggo-static-v4';
+const SHELL = ['/offline.html', '/icon.svg', '/manifest.webmanifest'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)));
   self.skipWaiting();
@@ -11,10 +11,9 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
   if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).then(response => {
-      if (response.ok) { const copy = response.clone(); event.waitUntil(caches.open(CACHE).then(cache => cache.put('/', copy))); }
-      return response;
-    }).catch(async () => (await caches.match('/')) || (await caches.match('/offline.html'))));
+    event.respondWith(fetch(event.request, {cache: 'no-store'}).catch(async () =>
+      (await caches.open(CACHE)).match('/offline.html'),
+    ).then(response => response || Response.error()));
     return;
   }
   if (/^\/(images\/|fonts\/|_next\/static\/|icon|manifest)/.test(url.pathname)) {

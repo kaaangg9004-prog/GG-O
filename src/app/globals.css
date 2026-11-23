@@ -230,6 +230,3 @@ html[lang=vi] .header-inner>nav>a,html[lang=en] .header-inner>nav>a{font-size:12
   visibility: hidden;
 }
 .has-header-tooltip:focus-visible::after { visibility: visible; }
-@media (hover: hover) {
-  .has-header-tooltip:hover::after { visibility: visible; }
-}
