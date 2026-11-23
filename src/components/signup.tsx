@@ -7,6 +7,7 @@ import { getSupabase } from '@/lib/supabase-service';
 import { beginSocialSignup, providerName, type SocialProvider } from '@/lib/social-auth';
 import { hasRegistrationConsent, saveRegistrationConsent } from '@/lib/registration-consent';
 import { hasMemberConsent, acceptMemberConsent } from '@/lib/member-consent';
+import { qaAuthEnabled, qaEmails } from '@/lib/qa-auth';
 import { clearDemoLogin } from '@/lib/demo-login';
 import { Logo, Modal } from './ui';
 import { SocialChoices } from './social-buttons';
@@ -101,6 +102,7 @@ export default function Signup() {
         <form
           onSubmit={async (e) => {
             e.preventDefault();
+            const form = new FormData(e.currentTarget);
             setError('');
             if (!agreed || !hasRegistrationConsent()) {
               setError('이용약관과 개인정보 처리방침에 먼저 동의해 주세요.');
@@ -116,6 +118,19 @@ export default function Signup() {
                 await acceptMemberConsent(client, data.user.id);
                 clearDemoLogin();
                 window.location.assign('/#my');
+              } else if (qaAuthEnabled) {
+                const client = getSupabase();
+                const email = String(form.get('email'));
+                if (!client || !qaEmails.includes(email)) throw new Error('지정된 테스트 이메일을 사용해 주세요.');
+                const { data, error } = await client.auth.signUp({email, password: String(form.get('password'))});
+                if (error) throw error;
+                if (data.session && data.user) {
+                  await acceptMemberConsent(client, data.user.id);
+                  window.location.assign('/');
+                } else {
+                  setError('테스트 계정 인증을 완료한 뒤 로그인해 주세요.');
+                  setBusy(false);
+                }
               } else {
                 await beginSocialSignup(provider);
               }
@@ -125,8 +140,13 @@ export default function Signup() {
             }
           }}
         >
-          <span className="signup-provider-label">가입할 계정 선택</span>
-          <SocialChoices selected={provider} onSelect={setProvider} disabled={busy || existingMember} />
+          {qaAuthEnabled && !existingMember ? <>
+            <label>테스트 이메일<input name="email" type="email" required /></label>
+            <label>테스트 비밀번호<input name="password" type="password" minLength={12} required /></label>
+          </> : <>
+            <span className="signup-provider-label">가입할 계정 선택</span>
+            <SocialChoices selected={provider} onSelect={setProvider} disabled={busy || existingMember} />
+          </>}
 
           {existingMember && (
             <p className="signup-connected-note">

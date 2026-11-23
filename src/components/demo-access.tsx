@@ -8,6 +8,7 @@ import {hasMemberConsent} from '@/lib/member-consent';
 import Experience from './experience';
 import {Modal} from './ui';
 import {SocialLinks} from './social-buttons';
+import {qaAuthEnabled, qaEmails} from '@/lib/qa-auth';
 
 export default function DemoAccess(){
   const localize=useLocalized();
@@ -39,6 +40,22 @@ export default function DemoAccess(){
 }
 export function LoginForm(){
   const localize=useLocalized();
+  const [error,setError]=useState('');
+  if(qaAuthEnabled)return <form className="auth-form" onSubmit={async event=>{
+    event.preventDefault();
+    const form=new FormData(event.currentTarget);
+    const email=String(form.get('email'));
+    const client=getSupabase();
+    if(!client||!qaEmails.includes(email))return;
+    const {error:loginError}=await client.auth.signInWithPassword({email,password:String(form.get('password'))});
+    if(loginError)setError(loginError.message);
+    else window.location.reload();
+  }}>
+    <label>테스트 이메일<input name="email" type="email" required /></label>
+    <label>테스트 비밀번호<input name="password" type="password" required /></label>
+    <button type="submit">테스트 로그인</button>
+    {error&&<p role="alert">{error}</p>}
+  </form>;
   if(!getSupabase())return localize(<div className="auth-form"><p role="status">소셜 로그인을 준비 중입니다.</p></div>);
   return localize(<div className="auth-form">
     <p>Google 계정으로 로그인하면 다른 기기에서도 같은 계정으로 활동을 이어갈 수 있습니다.</p>
