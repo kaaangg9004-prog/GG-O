@@ -29,11 +29,6 @@ export default function Signup() {
 
   useEffect(() => {
     let active = true;
-    const selected = new URLSearchParams(window.location.search).get('provider');
-    if (selected === 'google' || selected === 'facebook') {
-      setProvider(selected);
-    }
-
     const client = getSupabase();
     setConnected(!!client);
     if (!client) {
