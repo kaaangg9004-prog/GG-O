@@ -42,7 +42,7 @@ export function InformationLinks({
           <i aria-hidden="true">|</i>
         </span>
       ))}
-      <a href="mailto:contact.us.ggo@gmail.com">{copy[3]}: contact.us.ggo@gmail.com</a>
+      <a href="mailto:contact.US.GGO@gmail.com">{copy[3]}: contact.US.GGO@gmail.com</a>
     </nav>
   );
 }
