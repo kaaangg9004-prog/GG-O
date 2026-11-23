@@ -2,6 +2,7 @@
 
 import {useLocalized} from './locale-provider';
 import {useCallback,useEffect,useRef,useState} from 'react';
+import {ADMIN_NOTICE_KEY} from '@/lib/admin-notice';
 import {clearDemoLogin} from '@/lib/demo-login';
 import {getSupabase} from '@/lib/supabase-service';
 import {hasMemberConsent} from '@/lib/member-consent';
@@ -34,6 +35,9 @@ export default function DemoAccess(){
   useEffect(()=>{if(!loggedIn)return;setLoginRequested(false);const resume=pending.current;pending.current=null;resume?.();},[loggedIn]);
   const logout=async()=>{
     const client=getSupabase();if(client){const {error}=await client.auth.signOut();if(error){setAuthError('로그아웃하지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요.');return;}}
+    if (memberIdentity) {
+      try { sessionStorage.removeItem(ADMIN_NOTICE_KEY + memberIdentity.id); } catch {}
+    }
     clearDemoLogin();pending.current=null;setMemberIdentity(null);setLoggedIn(false);setAuthError('');setAccountLabel('');setLoginRequested(false);window.history.replaceState(null,'','/');setGeneration(value=>value+1);window.scrollTo({top:0});
   };
   return localize(<>{authError&&<div className="session-note" role="alert">{authError}</div>}<Experience key={generation} authenticated={loggedIn} onRequireAuth={requestAuth} onLogin={()=>requestAuth()} onLogout={logout} accountLabel={accountLabel} isDemoAccount={false} accountId={memberIdentity?.id} accountJoinedAt={memberIdentity?.joinedAt}/>{loginRequested&&!loggedIn&&!checking&&<Modal title="로그인" brand close={closeLogin}><LoginForm/></Modal>}</>);

@@ -47,7 +47,7 @@ export default function Signup() {
       .then(async ({ data }) => {
         if (!active) return;
         if (data.user && (await hasMemberConsent(client, data.user.id))) {
-          if (active) window.location.replace('/#my');
+          if (active) window.location.replace('/');
           return;
         }
         setExistingMember(!!data.user);
@@ -117,7 +117,7 @@ export default function Signup() {
                 if (error || !data.user) throw new Error('로그인 정보를 확인하지 못했습니다. 다시 로그인해 주세요.');
                 await acceptMemberConsent(client, data.user.id);
                 clearDemoLogin();
-                window.location.assign('/#my');
+                window.location.assign('/');
               } else if (qaAuthEnabled) {
                 const client = getSupabase();
                 const email = String(form.get('email'));

@@ -23,7 +23,7 @@ export default function OAuthCallback() {
       if(error||!data.user)throw new Error('로그인 정보를 확인하지 못했습니다. 회원가입 화면에서 다시 시도해 주세요.');
       if(!await completeMemberConsent(client,data.user.id,!!pendingSocialSignup()&&hasRegistrationConsent())){window.location.replace('/signup/?consent=required');return;}
       if(!active)return;
-      sessionStorage.removeItem(OAUTH_PENDING_KEY);clearDemoLogin();window.location.replace('/#my');
+      sessionStorage.removeItem(OAUTH_PENDING_KEY);clearDemoLogin();window.location.replace('/');
     };
     finish().catch(error=>{if(active)setError(error instanceof Error?error.message:'로그인을 완료하지 못했습니다. 다시 시도해 주세요.');});
     return()=>{active=false;};
