@@ -105,6 +105,11 @@ export function MemberBoard({
   const canManagePosts = !compact && authenticated && access.is_admin;
   const editorOpen = editing !== undefined;
   const categories = catalog?.map(board => board.name) ?? boardCategories.slice(1);
+  const boardLabel = (name: string) => catalog?.find(board => board.name === name)?.labels?.[localize.locale] ?? localize.text(name);
+  const translatedPost = (post: AnonymousPost): AnonymousPost => {
+    const translation = localize.locale === "ko" ? undefined : post.notice_translations?.[localize.locale];
+    return translation ? { ...post, ...translation } : post;
+  };
   useEffect(() => {
     let active = true;
     void gateway?.boards?.().then(boards => { if (active) setCatalog(boards); }).catch(() => {});
@@ -280,7 +285,7 @@ export function MemberBoard({
         p.topic === filter,
     )
     .filter((p) =>
-      (p.title + " " + p.body + " " + (p.prefix?.label ?? ""))
+      (p.title + " " + p.body + " " + (p.prefix?.label ?? "") + " " + p.tags.map(displayHashtag).join(" "))
         .toLocaleLowerCase()
         .includes(query.trim().toLocaleLowerCase()),
     );
@@ -307,6 +312,7 @@ export function MemberBoard({
           onChange={setFilter}
           settings={settings}
           categories={["전체", ...categories]}
+          categoryLabel={boardLabel}
         />
       )}
       {!compact && (
@@ -341,10 +347,10 @@ export function MemberBoard({
         <TopPosts
           posts={(compact ? shown.slice(0, 5) : shown).map((p) => ({
             id: p.id,
-            title: p.title,
-            prefix: communityTitlePrefix(p),
+            title: translatedPost(p).title,
+            prefix: communityTitlePrefix(p, localize.locale),
             prefixColor: communityTitleColor(p) ? prefixInk(communityTitleColor(p)!) : undefined,
-            topic: p.topic,
+            topic: boardLabel(p.topic),
             views: p.views ?? 0,
             comments: p.comment_count,
             score:
@@ -371,9 +377,9 @@ export function MemberBoard({
               onClick={() => openPost(p.id)}
             >
               <span className="board-row-main">
-                <span className="board-category">{p.topic}</span>
+                <span className="board-category" translate="no">{boardLabel(p.topic)}</span>
                 <span className="board-title" translate="no">
-                  <CommunityPostTitle post={p} />
+                  <CommunityPostTitle post={translatedPost(p)} />
                 </span>
                 <span className="board-comment-number">
                   [{p.comment_count}]
@@ -430,14 +436,17 @@ export function MemberBoard({
       {selected && gateway && (
         <Modal title="게시글" wide close={() => setSelected(null)}>
           <article className="board-detail">
-            <p className="eyebrow">{selected.topic} 게시판</p>
-            <h1 translate="no"><CommunityPostTitle post={selected} /></h1>
+            <p className="eyebrow" translate="no">{boardLabel(selected.topic)}</p>
+            <h1 translate="no"><CommunityPostTitle post={translatedPost(selected)} /></h1>
             <div className="board-detail-meta">
               <AnonymousLabel label={selected.author_label} />
               <time>{dateLabel(selected.created_at)}</time>
               <span>조회 {selected.views ?? 0}</span>
             </div>
-            <CommunityPostBody key={selected.id} post={selected} />
+            <CommunityPostBody key={selected.id} post={translatedPost(selected)} />
+            {selected.tags.length > 0 && <ul className="community-post-hashtags" aria-label="해시태그">
+              {selected.tags.map((tag, index) => <li key={index} translate="no">{displayHashtag(tag)}</li>)}
+            </ul>}
             {selected.is_mine && access.can_write && !selected.notice && (
               <div className="anonymous-owner-actions">
                 <button onClick={() => setEditing(selected)}>
@@ -486,7 +495,7 @@ export function MemberBoard({
             busy={busy}
             boards={catalog ?? categories.map(name => ({ name, position: 0, active: true, prefixes: [] }))}
             initialBoard={categories.includes(filter) ? filter : categories[0]}
-            onSave={(title, body, topic, prefix, size, color, images) =>
+            onSave={(title, body, topic, prefix, size, color, images, hashtags) =>
               run(async () => {
                 const result = await gateway.write(
                   editing ? "post.update" : "post.create",
@@ -498,6 +507,7 @@ export function MemberBoard({
                     body_size: size,
                     body_color: color,
                     images,
+                    ...(hashtags !== undefined ? { hashtags } : {}),
                     ...(prefix !== undefined ? { prefix_id: prefix } : {}),
                   },
                 );
@@ -525,7 +535,7 @@ export function MemberBoard({
 }
 export function CommunityPostTitle({ post }: { post: AnonymousPost }) {
   const color = communityTitleColor(post);
-  const prefix = communityTitlePrefix(post);
+  const prefix = communityTitlePrefix(post, useLocalized().locale);
   return <span translate="no">
     {prefix && <span className="community-title-prefix" style={color ? { color: prefixInk(color) } : undefined}>[{prefix}]</span>}{post.title}
   </span>;
@@ -611,8 +621,11 @@ function communityTitle(post: AnonymousPost) {
   const label = communityTitlePrefix(post);
   return label ? `[${label}]${post.title}` : post.title;
 }
-function communityTitlePrefix(post: AnonymousPost) {
-  return post.notice ? "공지" : post.prefix?.label;
+function communityTitlePrefix(post: AnonymousPost, locale: "ko" | "vi" | "en" = "ko") {
+  if (post.notice || post.prefix?.label === "공지") {
+    return { ko: "공지", vi: "Thông báo", en: "Notice" }[locale];
+  }
+  return post.prefix?.label;
 }
 function communityTitleColor(post: AnonymousPost) {
   return post.notice ? post.notice_color ?? "#c23147" : post.prefix?.color;
@@ -656,6 +669,7 @@ interface DraftPostImage {
   source?: string;
   width: number;
 }
+const displayHashtag = (tag: string) => "#" + tag.replace(/^#+/, "");
 function PostEditor({
   post,
   busy,
@@ -667,7 +681,7 @@ function PostEditor({
   busy: boolean;
   boards: CommunityBoard[];
   initialBoard?: string;
-  onSave: (title: string, body: string, topic: string, prefix: string | null | undefined, size: BodySize | null, color: string | null, images: CommunityPostImage[]) => Promise<void>;
+  onSave: (title: string, body: string, topic: string, prefix: string | null | undefined, size: BodySize | null, color: string | null, images: CommunityPostImage[], hashtags?: string) => Promise<void>;
 }) {
   const localize = useLocalized(),
     [title, setTitle] = useState(post?.title ?? ""),
@@ -676,7 +690,11 @@ function PostEditor({
     [topic, setTopic] = useState(post?.topic ?? initialBoard ?? ""),
     [prefix, setPrefix] = useState(post?.prefix?.id ?? ""),
     [size, setSize] = useState<BodySize>(post?.body_size ?? "normal"),
-    [color, setColor] = useState(post?.body_color ?? null);
+    [color, setColor] = useState(post?.body_color ?? null),
+    [hashtags, setHashtags] = useState(post?.tags.map(displayHashtag).join(" ") ?? ""),
+    [hashtagsChanged, setHashtagsChanged] = useState(false);
+  const tags = Array.from(new Set(hashtags.split(/[\s,#]+/).filter(Boolean).map(tag => tag.toLowerCase())));
+  const invalidHashtags = hashtagsChanged && (tags.length > 6 || tags.some(tag => [...tag].length > 24));
   const [working, setWorking] = useState(false);
   const [photoError, setPhotoError] = useState("");
   const [savedUrls, setSavedUrls] = useState<Record<string, string>>({});
@@ -741,7 +759,7 @@ function PostEditor({
         if (!path) throw new Error("첨부 사진을 저장하지 못했습니다.");
         placements.push({ path, offset: Math.max(0, Math.min(offset, Array.from(body).length)), width: image.width });
       }
-      await onSave(title.trim(), body, topic, prefix || (post?.prefix ? null : undefined), size === "normal" ? null : size, color, placements);
+      await onSave(title.trim(), body, topic, prefix || (post?.prefix ? null : undefined), size === "normal" ? null : size, color, placements, hashtagsChanged ? hashtags : undefined);
     } catch (reason) {
       setPhotoError(failure(reason));
     } finally {
@@ -764,8 +782,8 @@ function PostEditor({
         게시판 분류
         <select value={topic} onChange={(e) => { setTopic(e.target.value); setPrefix(""); }} required>
           {boards.map((board) => (
-            <option key={board.name} value={board.name}>
-              {board.name}
+            <option key={board.name} value={board.name} translate="no">
+              {board.labels?.[localize.locale] ?? localize.text(board.name)}
             </option>
           ))}
         </select>
@@ -786,6 +804,11 @@ function PostEditor({
           maxLength={100}
           required
         />
+      </label>
+      <label>해시태그
+        <input value={hashtags} onChange={event => { setHashtagsChanged(true); setHashtags(event.target.value); }}
+          placeholder="#여행 #맛집" maxLength={200} aria-invalid={invalidHashtags} />
+        <small>{invalidHashtags ? "해시태그는 최대 6개, 각 24자까지 입력할 수 있습니다." : "띄어쓰기나 쉼표로 구분해 최대 6개까지 추가할 수 있습니다."}</small>
       </label>
       <div className="post-format-toolbar" role="group" aria-label="본문 꾸미기">
         <label>본문 글자 크기
@@ -847,7 +870,7 @@ function PostEditor({
       {photoError && <p role="alert">{photoError}</p>}
       <button
         className="button button-dark"
-        disabled={busy || working || !topic || title.trim().length < 2 || (!images.length && body.length < 3)}
+        disabled={busy || working || invalidHashtags || !topic || title.trim().length < 2 || (!images.length && body.length < 3)}
       >
         {busy || working ? "처리 중" : "저장하기"}
       </button>

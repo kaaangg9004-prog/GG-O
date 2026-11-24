@@ -54,6 +54,7 @@ function postDTO(value: unknown): AnonymousPost {
     topic: v.topic,
     prefix: v.prefix && /^#[0-9a-f]{6}$/i.test(v.prefix.color) ? v.prefix : null,
     notice: v.notice === true,
+    notice_translations: v.notice_translations,
     notice_color: v.notice_color && /^#[0-9a-f]{6}$/i.test(v.notice_color) ? v.notice_color : null,
     pin_rank: v.pin_rank ?? null,
     tags: Array.isArray(v.tags)

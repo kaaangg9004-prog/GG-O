@@ -9,10 +9,12 @@ export function CommunityNavigation<T extends string = CommunityFilter>({
   onChange,
   settings,
   categories = boardCategories as unknown as readonly T[],
+  categoryLabel,
 }: {
   value: T | "hot";
   onChange: (value: T | "hot") => void;
   categories?: readonly T[];
+  categoryLabel?: (category: T) => string;
   settings: SiteSettings;
   hotCount?: number;
 }) {
@@ -39,7 +41,7 @@ export function CommunityNavigation<T extends string = CommunityFilter>({
             className={value === category ? "selected" : ""}
             onClick={() => onChange(category)}
           >
-            {category}
+            {categoryLabel ? <span translate="no">{categoryLabel(category)}</span> : category}
           </button>
         ))}
       </div>

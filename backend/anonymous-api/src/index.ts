@@ -22,8 +22,8 @@ const actions = new Set([
   "poll_comment.delete",
 ]);
 const allowed: Record<string, string[]> = {
-  "post.create": ["title", "body", "topic", "prefix_id", "body_size", "body_color", "images"],
-  "post.update": ["id", "title", "body", "topic", "prefix_id", "body_size", "body_color", "images"],
+  "post.create": ["title", "body", "topic", "prefix_id", "body_size", "body_color", "images", "hashtags"],
+  "post.update": ["id", "title", "body", "topic", "prefix_id", "body_size", "body_color", "images", "hashtags"],
   "post.delete": ["id"],
   "comment.create": ["post_id", "body", "parent_id"],
   "comment.update": ["id", "body"],
