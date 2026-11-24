@@ -10,15 +10,15 @@ import { CommunityPostTitle } from "./member-board";
 type BoardAction = (action: string, data: Record<string, unknown>) => Promise<void>;
 const message = (error: unknown) => error instanceof Error ? error.message : "게시판 요청에 실패했습니다.";
 const titleColors = [
-  ["빨강", "#a22f37"],
-  ["주황", "#a44910"],
-  ["노랑", "#856300"],
-  ["초록", "#26723e"],
-  ["파랑", "#2456aa"],
-  ["남색", "#28377c"],
-  ["보라", "#76399a"],
-  ["청록", "#24556b"],
-  ["회색", "#545864"],
+  ["딸기 우유", "#f2a5b7"],
+  ["살구", "#f5ad85"],
+  ["레몬 크림", "#f1d383"],
+  ["민트", "#97d4b3"],
+  ["하늘", "#9fcaf5"],
+  ["페리윙클", "#a6b1ed"],
+  ["라벤더", "#c9a9eb"],
+  ["아쿠아", "#8dd1d4"],
+  ["연회색", "#c3c7d3"],
   ["검정", "#161616"],
 ];
 
@@ -100,6 +100,14 @@ export function CommunityBoardAdmin() {
     <h2>게시판 관리</h2>
     {error && <p role="alert">{error}</p>}
     {result && <p role="status">{result}</p>}
+    <div className="board-management-layout">
+    <aside className="standard-form board-management-sidebar" aria-label="게시판 목록과 설정">
+    <ul className="board-management-list" aria-label="게시판 목록">
+      {boards.map(item => <li key={item.name}>
+        <button type="button" aria-pressed={selected === item.name} disabled={busy}
+          onClick={() => { setSelected(item.name); setQuery(""); }}>{item.name}</button>
+      </li>)}
+    </ul>
     <form className="standard-form" onSubmit={event => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -110,27 +118,26 @@ export function CommunityBoardAdmin() {
       <button className="button button-dark" disabled={busy}>게시판 추가</button>
     </form>
 
-    <label>관리할 게시판
-      <select value={selected} onChange={event => { setSelected(event.target.value); setQuery(""); }} disabled={busy}>
-        {boards.map(item => <option key={item.name} value={item.name}>{item.name}{item.active ? "" : " (숨김)"}</option>)}
-      </select>
-    </label>
-    {board && <>
+    {board && <div className="standard-form">
       <form key={board.name + board.position} className="standard-form" onSubmit={event => {
         event.preventDefault();
         submit("board.update", { board: board.name, position: Number(new FormData(event.currentTarget).get("position")) });
       }}>
         <label>표시 순서 (작은 숫자가 먼저)<input type="number" name="position" min={0} max={10000} required defaultValue={board.position} /></label>
-        <button className="button button-light" disabled={busy}>순서 저장</button>
+        <button className="button button-light" disabled={busy}>게시판 순서 변경</button>
       </form>
       <button className="button button-light" disabled={busy} onClick={() => {
         if (!board.active || window.confirm("게시판을 숨길까요? 기존 글과 댓글은 보관되며 다시 표시할 수 있습니다.")) {
           submit("board.update", { board: board.name, active: !board.active });
         }
       }}>{board.active ? "게시판 삭제(숨김)" : "게시판 다시 표시"}</button>
-
-      {board.active && <>
-        <h3>말머리와 글 제목 색상</h3>
+    </div>}
+    </aside>
+    <div className="standard-form board-management-content" aria-label="공지와 말머리 관리">
+      {board && <h3>{board.name}</h3>}
+      {board && !board.active && <p>숨김 상태입니다. 게시판을 다시 표시하면 공지와 말머리를 관리할 수 있습니다.</p>}
+      {board?.active && <>
+        <h3>말머리 관리</h3>
         <form key={board.name} className="standard-form" onSubmit={event => {
           event.preventDefault();
           const form = event.currentTarget;
@@ -140,10 +147,10 @@ export function CommunityBoardAdmin() {
             .then(() => form.reset()).catch(() => {});
         }}>
           <label>새 말머리<input name="label" maxLength={24} required /></label>
-          <TitleColorPalette color="#24556b" label="제목 색상" />
+          <TitleColorPalette color="#9fcaf5" label="말머리 색상" />
           <button className="button button-dark" disabled={busy}>말머리 추가</button>
         </form>
-        {board.prefixes.map(prefix => <form
+        {board.prefixes.filter(prefix => prefix.label !== "공지").map(prefix => <form
           key={prefix.id + prefix.color + prefix.active}
           className="board-admin-prefix"
           onSubmit={event => {
@@ -151,8 +158,8 @@ export function CommunityBoardAdmin() {
             submit("prefix.save", { board: board.name, label: prefix.label, color: new FormData(event.currentTarget).get("color") });
           }}
         >
-          <span style={{ color: prefix.color }}>[{prefix.label}]글제목{prefix.active ? "" : " (사용 중지)"}</span>
-          <TitleColorPalette color={prefix.color} label={prefix.label + " 제목 색상"} />
+          <span><span className="community-title-prefix" style={{ color: `color-mix(in srgb, ${prefix.color} 60%, #161616)` }}>[{prefix.label}]</span>글제목{prefix.active ? "" : " (사용 중지)"}</span>
+          <TitleColorPalette color={prefix.color} label={prefix.label + " 말머리 색상"} />
           <button className="button button-light" disabled={busy}>{prefix.active ? "색상 저장" : "다시 사용"}</button>
           {prefix.active && <button type="button" className="button button-light" disabled={busy} onClick={() => {
             if (window.confirm("말머리를 삭제할까요? 기존 글의 말머리는 유지됩니다.")) {
@@ -166,7 +173,7 @@ export function CommunityBoardAdmin() {
           event.preventDefault();
           submit("board.update", { board: board.name, notice_color: new FormData(event.currentTarget).get("color") });
         }}>
-          <TitleColorPalette color={board.notice_color ?? "#a22f37"} label="[공지] 제목 색상" />
+          <TitleColorPalette color={board.notice_color ?? "#c23147"} label="[공지] 말머리 색상" />
           <button className="button button-light" disabled={busy}>공지 색상 저장</button>
         </form>
         <NoticeForm key={board.name} busy={busy} save={(title, body) => act("notice.create", { board: board.name, title, body })} />
@@ -188,7 +195,8 @@ export function CommunityBoardAdmin() {
           }}>공지 삭제</button>
         </details>)}
       </>}
-    </>}
+    </div>
+    </div>
   </section>;
 }
 

@@ -4,7 +4,7 @@ export {};
 declare const Deno:{env:{get:(name:string)=>string|undefined};serve:(handler:(request:Request)=>Promise<Response>)=>void};
 const productionOrigins=new Set(['https://www.gg-o.net','https://gg-o-kculture.fitfern517.chatgpt.site']);
 const allowed:Record<string,string[]>={
- 'post.create':['title','body','topic','prefix_id'],'post.update':['id','title','body','topic','prefix_id'],'post.delete':['id'],
+ 'post.create':['title','body','topic','prefix_id','body_size','body_color'],'post.update':['id','title','body','topic','prefix_id','body_size','body_color'],'post.delete':['id'],
  'comment.create':['post_id','body','parent_id'],'comment.update':['id','body'],'comment.delete':['id'],
  'poll_comment.create':['poll_id','body','parent_id'],'poll_comment.update':['id','body'],'poll_comment.delete':['id']
 };

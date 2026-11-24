@@ -338,8 +338,9 @@ export function MemberBoard({
         <TopPosts
           posts={(compact ? shown.slice(0, 5) : shown).map((p) => ({
             id: p.id,
-            title: communityTitle(p),
-            titleColor: communityTitleColor(p),
+            title: p.title,
+            prefix: communityTitlePrefix(p),
+            prefixColor: communityTitleColor(p) ? prefixInk(communityTitleColor(p)!) : undefined,
             topic: p.topic,
             views: p.views ?? 0,
             comments: p.comment_count,
@@ -434,7 +435,7 @@ export function MemberBoard({
               <span>조회 {selected.views ?? 0}</span>
             </div>
             <div className="board-body">
-              <p translate="no">{selected.body}</p>
+              <p translate="no" style={bodyStyle(selected.body_size, selected.body_color)}>{selected.body}</p>
             </div>
             {selected.is_mine && access.can_write && !selected.notice && (
               <div className="anonymous-owner-actions">
@@ -484,7 +485,7 @@ export function MemberBoard({
             busy={busy}
             boards={catalog ?? categories.map(name => ({ name, position: 0, active: true, prefixes: [] }))}
             initialBoard={categories.includes(filter) ? filter : categories[0]}
-            onSave={(title, body, topic, prefix) =>
+            onSave={(title, body, topic, prefix, size, color) =>
               run(async () => {
                 const result = await gateway.write(
                   editing ? "post.update" : "post.create",
@@ -493,6 +494,8 @@ export function MemberBoard({
                     title,
                     body,
                     topic,
+                    body_size: size,
+                    body_color: color,
                     ...(prefix !== undefined ? { prefix_id: prefix } : {}),
                   },
                 );
@@ -520,8 +523,9 @@ export function MemberBoard({
 }
 export function CommunityPostTitle({ post }: { post: AnonymousPost }) {
   const color = communityTitleColor(post);
-  return <span translate="no" style={color ? { color } : undefined}>
-    {communityTitle(post)}
+  const prefix = communityTitlePrefix(post);
+  return <span translate="no">
+    {prefix && <span className="community-title-prefix" style={color ? { color: prefixInk(color) } : undefined}>[{prefix}]</span>}{post.title}
   </span>;
 }
 function BoardPostManagement({ post, boards, close, save, open, openAuthor }: {
@@ -602,11 +606,24 @@ function BoardPostManagement({ post, boards, close, save, open, openAuthor }: {
   </Modal>;
 }
 function communityTitle(post: AnonymousPost) {
-  const label = post.notice ? "공지" : post.prefix?.label;
+  const label = communityTitlePrefix(post);
   return label ? `[${label}]${post.title}` : post.title;
 }
+function communityTitlePrefix(post: AnonymousPost) {
+  return post.notice ? "공지" : post.prefix?.label;
+}
 function communityTitleColor(post: AnonymousPost) {
-  return post.notice ? post.notice_color ?? "#a22f37" : post.prefix?.color;
+  return post.notice ? post.notice_color ?? "#c23147" : post.prefix?.color;
+}
+function prefixInk(color: string) {
+  return `color-mix(in srgb, ${color} 60%, #161616)`;
+}
+type BodySize = NonNullable<AnonymousPost["body_size"]>;
+const bodySizes: Record<BodySize, string | undefined> = {
+  small: "0.875rem", normal: undefined, large: "1.25rem", "extra-large": "1.5rem",
+};
+function bodyStyle(size?: BodySize | null, color?: string | null) {
+  return { fontSize: size ? bodySizes[size] : undefined, color: color ?? undefined };
 }
 function PostEditor({
   post,
@@ -619,13 +636,15 @@ function PostEditor({
   busy: boolean;
   boards: CommunityBoard[];
   initialBoard?: string;
-  onSave: (title: string, body: string, topic: string, prefix?: string | null) => Promise<void>;
+  onSave: (title: string, body: string, topic: string, prefix: string | null | undefined, size: BodySize | null, color: string | null) => Promise<void>;
 }) {
   const localize = useLocalized(),
     [title, setTitle] = useState(post?.title ?? ""),
     [body, setBody] = useState(post?.body ?? ""),
     [topic, setTopic] = useState(post?.topic ?? initialBoard ?? ""),
-    [prefix, setPrefix] = useState(post?.prefix?.id ?? "");
+    [prefix, setPrefix] = useState(post?.prefix?.id ?? ""),
+    [size, setSize] = useState<BodySize>(post?.body_size ?? "normal"),
+    [color, setColor] = useState(post?.body_color ?? null);
   const prefixes = boards.find(board => board.name === topic)?.prefixes ?? [];
   const originalPrefix = topic === post?.topic ? post.prefix : null;
   const choices = originalPrefix && !prefixes.some(item => item.id === originalPrefix.id)
@@ -636,7 +655,7 @@ function PostEditor({
       onSubmit={(e) => {
         e.preventDefault();
         const hadPrefix = !!post?.prefix;
-        void onSave(title.trim(), body.trim(), topic, prefix || (hadPrefix ? null : undefined));
+        void onSave(title.trim(), body.trim(), topic, prefix || (hadPrefix ? null : undefined), size === "normal" ? null : size, color);
       }}
     >
       <label>
@@ -666,10 +685,21 @@ function PostEditor({
           required
         />
       </label>
+      <div className="post-format-toolbar" role="group" aria-label="본문 꾸미기">
+        <label>본문 글자 크기
+          <select value={size} onChange={event => setSize(event.target.value as BodySize)}>
+            <option value="small">작게</option><option value="normal">기본</option>
+            <option value="large">크게</option><option value="extra-large">아주 크게</option>
+          </select>
+        </label>
+        <label>본문 글자색<input type="color" value={color ?? "#161616"} onChange={event => setColor(event.target.value)} /></label>
+        <button type="button" className="button button-light" onClick={() => { setSize("normal"); setColor(null); }}>기본 서식</button>
+      </div>
       <label>
         내용
         <textarea
           value={body}
+          style={bodyStyle(size, color)}
           onChange={(e) => setBody(e.target.value)}
           minLength={3}
           maxLength={3000}
