@@ -1,5 +1,6 @@
 'use client';
 
+import {ContentShare} from './content-share';
 import {useLocalized} from './locale-provider';
 import {AdminConsole} from './admin-console';
 import {CommunityBoardAdmin} from './community-board-admin';
@@ -11,6 +12,7 @@ import {InformationLinks} from './information-links';
 import {MemberBoard,AnonymousAdmin} from './member-board';
 import {anonymousGateway} from '@/lib/anonymous-service';
 import {communityPostId} from '@/lib/community-post-link';
+import {contentShareRoute} from '@/lib/content-share-link';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {ArrowUpRight,Bell,Check,Download,Flag,Heart,LifeBuoy,LayoutDashboard,Mail,Menu,MessageSquare,Plus,Search,ShieldCheck,UserRound,X} from 'lucide-react';
 import {articles,dateLabel} from '@/lib/data';
@@ -55,6 +57,7 @@ const nav=primaryNavigation;
 type InstallEvent=Event&{prompt:()=>Promise<void>;userChoice:Promise<{outcome:string}>};
 export default function Experience({authenticated=false,onRequireAuth=()=>{},onLogin,onLogout,accountLabel='',isDemoAccount=false,accountId,accountJoinedAt}:{authenticated?:boolean;onRequireAuth?:(resume:()=>void)=>void;onLogin?:()=>void;onLogout?:()=>void;accountLabel?:string;isDemoAccount?:boolean;accountId?:string;accountJoinedAt?:string}={}){
   const localize=useLocalized(),liveGateway=useMemo(()=>anonymousGateway(),[]),adminGateway=useMemo(()=>siteAdminGateway(),[]),journalGateway=useMemo(()=>magazineGateway(),[]),editorial=useMemo(()=>editorialGateway(),[]);
+  const [sharedArticleId,setSharedArticleId]=useState<string|null>(null);
   const [sharedPostId,setSharedPostId]=useState<string|null>(null);
   const [authorPostId,setAuthorPostId]=useState<string>();
   const [mobileHome, setMobileHome] = useState(false);
@@ -73,7 +76,7 @@ export default function Experience({authenticated=false,onRequireAuth=()=>{},onL
   const request=(action:()=>void)=>{if(authRef.current){action();return;}onRequireAuth(action);};
   const notify=useCallback((message:string)=>setToast(message),[]);
   const mutate=(fn:(state:LocalState)=>LocalState)=>{if(!authRef.current||!ready)return false;try{const next=fn(dataRef.current);localStorage.setItem(STORAGE_KEY,JSON.stringify(next));dataRef.current=next;setData(next);return true;}catch(error){notify(error instanceof Error&&/[가-힣]/.test(error.message)?error.message:'저장하지 못했습니다. 브라우저 저장 공간을 확인해 주세요.');return false;}};
-  const goRaw=(next:View,detailId?:string)=>{setSharedPostId(next==='community'&&detailId?communityPostId('#community?id='+encodeURIComponent(detailId)):null);setAuthorPostId(undefined);setView(next);viewRef.current=next;setPost(null);setPoll(null);setPanel(null);setArticle(null);setMobileMenu(false);window.history.pushState(null,'',next==='home'?'#':`#${next}${detailId?'?id='+encodeURIComponent(detailId):''}`);window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});};
+  const goRaw=(next:View,detailId?:string)=>{setSharedPostId(next==='community'&&detailId?communityPostId('#community?id='+encodeURIComponent(detailId)):null);setAuthorPostId(undefined);setSharedArticleId(null);setView(next);viewRef.current=next;setPost(null);setPoll(null);setPanel(null);setArticle(null);setMobileMenu(false);window.history.pushState(null,'',next==='home'?window.location.pathname:`#${next}${detailId?'?id='+encodeURIComponent(detailId):''}`);window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});};
   const go=(next:View)=>{next=normalize(next);goRaw(next);if(protectedViews.includes(next)&&!authRef.current)onRequireAuth(()=>goRaw(next));};
   const liveBoard=!!getSupabase()&&!(authenticated&&isDemoAccount);
   const write=()=>{if(liveBoard){go('community');return;}request(()=>{if(!canWriteCommunity){notify('게시글·댓글 작성이 잠시 중단되었습니다.');return;}setPanel('compose');});};
@@ -84,7 +87,7 @@ export default function Experience({authenticated=false,onRequireAuth=()=>{},onL
   useEffect(()=>{
     authRef.current=authenticated;
     try{const restored=readState(localStorage.getItem(STORAGE_KEY));dataRef.current=restored;setData(restored);localStorage.setItem(STORAGE_KEY,JSON.stringify(restored));}catch{setData(readState(null));setToast('브라우저 저장 공간을 사용할 수 없습니다. 저장 기능을 허용한 뒤 다시 열어 주세요.');}setReady(true);
-    const hash=()=>{const raw=window.location.hash.slice(1).split('?')[0],next=normalize(raw);if(raw&&raw!==next)window.history.replaceState(null,'',`#${next}`);setSharedPostId(communityPostId(window.location.hash));setAuthorPostId(undefined);setView(next);viewRef.current=next;setPost(null);setPoll(null);setPanel(null);if(protectedViews.includes(next)&&!authRef.current)onRequireAuth(()=>goRaw(next));};hash();window.addEventListener('hashchange',hash);window.addEventListener('popstate',hash);
+    const hash=()=>{const locationRoute=contentShareRoute(window.location);const [raw,query]=locationRoute.slice(1).split('?'),next=normalize(raw),id=new URLSearchParams(query).get('id');if(raw&&raw!==next)window.history.replaceState(null,'',`#${next}`);setSharedPostId(communityPostId(locationRoute));setAuthorPostId(undefined);setView(next);viewRef.current=next;setPost(null);setPoll(next==='polls'?id:null);setArticle(null);setSharedArticleId(next==='journal'?id:null);setPanel(null);if(protectedViews.includes(next)&&!authRef.current)onRequireAuth(()=>goRaw(next));};hash();window.addEventListener('hashchange',hash);window.addEventListener('popstate',hash);
     const sync=(event:StorageEvent)=>{if(event.key===STORAGE_KEY){const restored=readState(event.newValue);dataRef.current=restored;setData(restored);}};window.addEventListener('storage',sync);
     const before=(event:Event)=>{event.preventDefault();setInstall(event as InstallEvent);};window.addEventListener('beforeinstallprompt',before);
     if('serviceWorker'in navigator&&process.env.NODE_ENV==='production')navigator.serviceWorker.register('/sw.js').then(registration=>registration.update()).catch(()=>{});
@@ -154,6 +157,19 @@ export default function Experience({authenticated=false,onRequireAuth=()=>{},onL
   const pending=data.reports.filter(report=>report.status==='pending').length;
   const homePolls=(remotePolls??polls).slice(0,4).map(poll=>({...poll,title:polls.some(seed=>seed.id===poll.id&&isPresetPollText(seed,poll.title))?localize.text(poll.title):poll.title}));
   const openArticle=(item:MagazineArticle)=>{if(liveBoard&&journalGateway)journalGateway.open(item.id).then(setArticle).catch(()=>notify('매거진을 불러오지 못했습니다.'));else setArticle(item);};
+  useEffect(()=>{
+    if(!sharedArticleId)return;
+    let active=true;
+    const request=liveBoard&&journalGateway
+      ?journalGateway.open(sharedArticleId)
+      :Promise.resolve(listedArticles(dataRef.current).find(item=>item.id===sharedArticleId));
+    void request.then(item=>{
+      if(!active)return;
+      if(item)setArticle(item);
+      else notify('매거진을 찾을 수 없습니다.');
+    }).catch(()=>{if(active)notify('매거진을 불러오지 못했습니다.');});
+    return()=>{active=false;};
+  },[sharedArticleId,liveBoard,journalGateway,notify]);
   const articleCard=(item:MagazineArticle)=><button className="journal-card" key={item.id} onClick={()=>openArticle(item)}><div className="journal-image"><img src={item.image} alt="" loading="lazy"/><span className="circle-button"><ArrowUpRight size={22}/></span></div><div className="journal-meta"><span translate={isPresetMagazineText(item,item.tag)?'yes':'no'}>{item.tag}</span><span translate={isPresetMagazineText(item,item.read)?'yes':'no'}>{item.read}</span></div><h3 translate={isPresetMagazineText(item,item.title)?'yes':'no'}>{item.title}</h3><p translate={isPresetMagazineText(item,item.excerpt)?'yes':'no'}>{item.excerpt}</p></button>;
   const memberOnly=<EmptyState title="로그인하고 함께해요." text="로그인하면 글과 이벤트를 읽고 투표와 의견 나누기에 참여할 수 있습니다." action="로그인" onAction={()=>request(()=>{})}/>;
   const refreshEditorial=async()=>{if(!editorial)return;const [news,events]=await Promise.all([editorial.news(),editorial.events()]);setRemoteNews(news);setRemoteEvents(events);if(authenticated)setRemoteReactions(await editorial.reactions());};
@@ -197,7 +213,7 @@ export default function Experience({authenticated=false,onRequireAuth=()=>{},onL
     <BottomDock view={view} onNavigate={go}/>{toast&&<div className="toast" role="status"><Check size={18}/><span>{toast}</span><button aria-label="안내 닫기" onClick={()=>setToast('')}><X size={16}/></button></div>}
     {panel==='compose'&&authenticated&&<Modal title="익명 글쓰기" close={()=>setPanel(null)} wide><Composer ownerKey={ownerKey} onSubmit={post=>{if(!canWriteCommunity){notify('게시글·댓글 작성이 잠시 중단되었습니다.');return;}if(mutate(state=>({...state,posts:[post,...state.posts]}))){go('community');notify('익명 글을 이 브라우저에 등록했습니다.');}}}/></Modal>}
     {activePost&&<Modal title="익명 게시판" close={()=>setPost(null)} wide><BoardDetail canWrite={canWriteCommunity} authenticated={authenticated} onRequireAuth={()=>onRequireAuth(()=>{})} key={activePost.id} ownerKey={ownerKey} reporterKey={accountId??ownerKey} post={activePost} state={data} onBack={()=>setPost(null)} onLike={()=>request(()=>mutate(state=>({...state,likes:toggleId(state.likes,activePost.id)})))} onSave={()=>request(()=>mutate(state=>({...state,savedPosts:toggleId(state.savedPosts,activePost.id)})))} onComment={text=>canWriteCommunity&&updatePost(activePost.id,post=>({...post,comments:[...post.comments,{id:crypto.randomUUID(),ownerKey,text,createdAt:new Date().toISOString()}]}))} onReport={report} onDelete={authenticated&&activePost.ownerKey===ownerKey?()=>{if(mutate(state=>({...state,posts:state.posts.filter(post=>post.id!==activePost.id)})))setPost(null);}:undefined}/></Modal>}
-    {article&&<Modal title="GG-O 매거진" close={()=>setArticle(null)} wide><article className="article-detail"><img src={article.image} alt="매거진 분위기 사진"/><div><p className="eyebrow" translate={isPresetMagazineText(article,article.tag)?'yes':'no'}>{article.tag} · {article.read}</p><h1 translate={isPresetMagazineText(article,article.title)?'yes':'no'}>{article.title}</h1><p className="article-lead" translate={isPresetMagazineText(article,article.excerpt)?'yes':'no'}>{article.excerpt}</p>{article.paragraphs.map(text=><p key={text}>{text}</p>)}<button className="button button-dark" onClick={()=>{setArticle(null);go('community');}}>게시판에서 이야기 나누기<ArrowUpRight size={18}/></button></div></article></Modal>}
+    {article&&<Modal title="GG-O 매거진" close={()=>setArticle(null)} wide><article className="article-detail"><ContentShare key={article.id} section="journal" id={article.id} title={article.title}/><img src={article.image} alt="매거진 분위기 사진"/><div><p className="eyebrow" translate={isPresetMagazineText(article,article.tag)?'yes':'no'}>{article.tag} · {article.read}</p><h1 translate={isPresetMagazineText(article,article.title)?'yes':'no'}>{article.title}</h1><p className="article-lead" translate={isPresetMagazineText(article,article.excerpt)?'yes':'no'}>{article.excerpt}</p>{article.paragraphs.map(text=><p key={text}>{text}</p>)}<button className="button button-dark" onClick={()=>{setArticle(null);go('community');}}>게시판에서 이야기 나누기<ArrowUpRight size={18}/></button></div></article></Modal>}
     {panel==='info'&&<Modal title={info} close={()=>setPanel(null)}><InfoContent title={info}/></Modal>}
     {panel==='admin-notice'&&canManage&&<Modal title="알림" close={()=>setPanel(null)}>
       <p>사이트 관리 탭에 새로운 알림이 있습니다.</p>

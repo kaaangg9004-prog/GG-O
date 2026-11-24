@@ -4,6 +4,7 @@ import {ArrowLeft,ArrowUpRight,Plus,MessageSquare} from 'lucide-react';
 import type {LocalState} from '@/lib/types';
 import {listedNews,saveNews,commentNews,anonymousNewsComments,type NewsArticle} from '@/lib/news';
 import {readProductPhoto} from '@/lib/product-images';
+import {ContentShare} from './content-share';
 import {useLocalized} from './locale-provider';
 import {useDetailRoute} from './use-detail-route';
 import {editorialGateway,type SharedNews} from '@/lib/editorial-service';
@@ -22,7 +23,7 @@ export function NewsPage({state,canManage,actor,canWrite,mutate,onRequireAuth}:{
  return localize(<section className="shell section page-section news-page">
  {loading?<p role="status">소식을 불러오는 중입니다.</p>:id?article?<article className="story-detail">
  <button className="back-link" onClick={()=>navigate(null)}><ArrowLeft size={17}/>소식 목록</button>
- <div className="story-heading"><p className="eyebrow" translate="no">{article.category} · GG-O</p><h1 translate="no">{article.title}</h1><p>운영자 · <time dateTime={article.createdAt}>{article.createdAt.slice(0,10)}</time></p></div>
+ <div className="story-heading"><p className="eyebrow" translate="no">{article.category} · GG-O</p><h1 translate="no">{article.title}</h1><ContentShare key={article.id} section="news" id={article.id} title={article.title}/><p>운영자 · <time dateTime={article.createdAt}>{article.createdAt.slice(0,10)}</time></p></div>
  <img className="story-cover" src={article.image} alt="소식 대표 이미지"/>
  <div className="story-copy" translate="no">{article.body.split('\n').filter(Boolean).map((p,i)=><p key={i}>{p}</p>)}</div>
  {canManage&&management(article)}

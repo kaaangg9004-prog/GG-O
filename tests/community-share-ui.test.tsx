@@ -28,7 +28,14 @@ test("a shared post opens directly and its link can be copied", async () => {
     assert.ok(dialog.getByText("운영자"));
     fireEvent.click(dialog.getByRole("button", { name: "링크 복사" }));
     await dialog.findByText("링크를 복사했습니다.");
-    assert.equal(copied, `${window.location.origin}/#community?id=${id}`);
+    assert.equal(copied, `${window.location.origin}/?share=community&id=${id}`);
+    assert.equal((dialog.getByRole("textbox", { name: "게시글 주소" }) as HTMLTextAreaElement).value, copied);
+    fireEvent.click(dialog.getByRole("button", { name: "공유하기" }));
+    assert.ok(dialog.getByRole("link", { name: "Facebook" }));
+    assert.ok(dialog.getByRole("link", { name: "X" }));
+    for (const name of ["Facebook Messenger", "Instagram", "Instagram DM", "카카오톡", "Zalo"]) {
+      assert.ok(dialog.getByRole("button", { name }));
+    }
   } finally {
     ui.unmount();
     if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);

@@ -281,8 +281,13 @@ html[lang=vi] .header-inner>nav>a,html[lang=en] .header-inner>nav>a{font-size:12
 .community-body-editor > label { display: grid; gap: 6px; }
 .community-body-editor textarea { width: 100%; }
 .community-body-editor textarea::placeholder { color: #6c7068; opacity: 1; }
-.community-link-copy { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
-.community-link-copy input { width: min(100%, 22rem); }
+.content-share { margin-block: 14px; min-width: 0; }
+.content-share-row { display: flex; align-items: stretch; gap: 6px; }
+.content-share-row textarea { flex: 1; min-width: 0; width: 100%; padding: 8px; border: 1px solid var(--line); font-size: 13px; resize: none; overflow-wrap: anywhere; }
+.content-share .button { min-height: 42px; padding: 8px 10px; flex-shrink: 0; white-space: nowrap; }
+.content-share-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.content-share-options[hidden] { display: none; }
+.content-share-result { margin-top: 6px; font-size: 13px; }
 .community-editor-image { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); }
 .community-inline-image, .board-body > .community-inline-image { display: block; max-width: 100%; height: auto; max-height: none; object-fit: contain; }
 .community-youtube-player { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; }
