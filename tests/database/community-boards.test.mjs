@@ -178,6 +178,35 @@ test('board management preserves old posts and guards metadata changes on the se
     await move('나 게시판', 1);
     await move(before[0], -1);
     assert.deepEqual(await order(), before);
+
+    const hashtagsMigration = files.find(file => file.endsWith('_community_hashtags.sql'));
+    assert.ok(hashtagsMigration);
+    await db.exec(readFileSync(new URL(hashtagsMigration, directory), 'utf8'));
+    await write('post.update', { id: post.id, title: '다음 일정', body: '날짜를 확인하세요', hashtags: '#여행 #맛집, Seoul #SEOUL' });
+    assert.deepEqual((await read('anonymous_post', [post.id])).tags, ['여행', '맛집', 'Seoul']);
+    for (const term of ['#여행', '여행', '#seoul']) {
+      assert.deepEqual((await read('anonymous_feed', ['사진', 30, null, null, term])).map(row => row.id), [post.id]);
+    }
+    assert.deepEqual(await read('anonymous_feed', ['사진', 30, null, null, '#여']), []);
+    await assert.rejects(write('post.update', { id: post.id, title: '다음 일정', body: '날짜를 확인하세요', hashtags: 'a b c d e f g' }), /GGO_INVALID_INPUT/);
+    await write('post.update', { id: post.id, title: '다음 일정', body: '날짜를 확인하세요' });
+    assert.deepEqual((await read('anonymous_post', [post.id])).tags, ['여행', '맛집', 'Seoul']);
+    await write('post.update', { id: post.id, title: '다음 일정', body: '날짜를 확인하세요', hashtags: '' });
+    assert.deepEqual(await read('anonymous_feed', ['사진', 30, null, null, '#여행']), []);
+
+    const translationMigration = files.find(file => file.endsWith('_community_translations.sql'));
+    assert.ok(translationMigration);
+    await db.exec(readFileSync(new URL(translationMigration, directory), 'utf8'));
+    await manage('board.create', { board: '여행', label_vi: 'Du lịch', label_en: 'Travel' });
+    await manage('board.update', { board: '여행', label_ko: '여행 이야기' });
+    const translatedBoard = (await read('community_board_catalog', [false])).find(board => board.name === '여행');
+    assert.deepEqual(translatedBoard.labels, { ko: '여행 이야기', vi: 'Du lịch', en: 'Travel' });
+    const translations = { vi: { title: 'Thông báo mới', body: 'Vui lòng đọc thông báo.' } };
+    await manage('notice.create', { board: '여행', title: '알려드립니다', body: '한국어 공지 내용', translations });
+    const [translatedNotice] = await read('community_board_highlights', ['여행']);
+    assert.equal(translatedNotice.title, '알려드립니다');
+    assert.deepEqual(translatedNotice.notice_translations, translations);
+    await assert.rejects(manage('notice.update', { board: '여행', id: translatedNotice.id, title: '알려드립니다', body: '한국어 공지 내용', translations }, member), /GGO_ADMIN_REQUIRED/);
   } finally {
     await db.close();
   }

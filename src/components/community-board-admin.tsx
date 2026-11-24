@@ -6,6 +6,7 @@ import { loadCommunityBoards, manageCommunityBoard, moveCommunityBoard } from "@
 import type { CommunityBoard } from "@/lib/community-boards";
 import type { AnonymousPost } from "@/lib/anonymous-types";
 import { CommunityPostTitle } from "./member-board";
+import { useLocalized } from "./locale-provider";
 
 type BoardAction = (action: string, data: Record<string, unknown>) => Promise<void>;
 const message = (error: unknown) => error instanceof Error ? error.message : "게시판 요청에 실패했습니다.";
@@ -39,6 +40,7 @@ function TitleColorPalette({ color, label }: { color: string; label: string }) {
 }
 
 export function CommunityBoardAdmin() {
+  const localize = useLocalized();
   const gateway = useMemo(anonymousGateway, []);
   const [boards, setBoards] = useState<CommunityBoard[]>([]);
   const [selected, setSelected] = useState("");
@@ -116,16 +118,19 @@ export function CommunityBoardAdmin() {
     <ul className="board-management-list" aria-label="게시판 목록">
       {boards.map(item => <li key={item.name}>
         <button type="button" aria-pressed={selected === item.name} disabled={busy}
-          onClick={() => { setSelected(item.name); setQuery(""); }}>{item.name}</button>
+          onClick={() => { setSelected(item.name); setQuery(""); }}>{item.labels?.[localize.locale] ?? localize.text(item.name)}</button>
       </li>)}
     </ul>
     <form className="standard-form" onSubmit={event => {
       event.preventDefault();
       const form = event.currentTarget;
-      const name = String(new FormData(form).get("board") ?? "").trim();
-      if (name) void act("board.create", { board: name }).then(() => form.reset()).catch(() => {});
+      const fields = new FormData(form);
+      const name = String(fields.get("board") ?? "").trim();
+      if (name) void act("board.create", { board: name, label_vi: fields.get("label_vi"), label_en: fields.get("label_en") }).then(() => form.reset()).catch(() => {});
     }}>
-      <label>새 게시판 이름<input name="board" maxLength={30} required /></label>
+      <label>한국어 게시판 이름<input name="board" maxLength={30} required /></label>
+      <label>베트남어 게시판 이름<input name="label_vi" maxLength={60} /></label>
+      <label>영어 게시판 이름<input name="label_en" maxLength={60} /></label>
       <button className="button button-dark" disabled={busy}>게시판 추가</button>
     </form>
 
@@ -142,7 +147,22 @@ export function CommunityBoardAdmin() {
     </div>}
     </aside>
     <div className="standard-form board-management-content" aria-label="공지와 말머리 관리">
-      {board && <h3>{board.name}</h3>}
+      {board && <>
+        <h3>{board.labels?.[localize.locale] ?? localize.text(board.name)}</h3>
+        <details key={board.name} className="board-admin-post">
+          <summary>언어별 게시판 이름 수정</summary>
+          <form className="standard-form" onSubmit={event => {
+            event.preventDefault();
+            const fields = new FormData(event.currentTarget);
+            submit("board.update", { board: board.name, label_ko: fields.get("label_ko"), label_vi: fields.get("label_vi"), label_en: fields.get("label_en") });
+          }}>
+            <label>한국어 이름<input name="label_ko" maxLength={30} required defaultValue={board.labels?.ko ?? board.name} /></label>
+            <label>베트남어 이름<input name="label_vi" maxLength={60} defaultValue={board.labels?.vi} /></label>
+            <label>영어 이름<input name="label_en" maxLength={60} defaultValue={board.labels?.en} /></label>
+            <button className="button button-light" disabled={busy}>게시판 이름 저장</button>
+          </form>
+        </details>
+      </>}
       {board && !board.active && <p>숨김 상태입니다. 게시판을 다시 표시하면 공지와 말머리를 관리할 수 있습니다.</p>}
       {board?.active && <>
         <h3>말머리 관리</h3>
@@ -184,7 +204,7 @@ export function CommunityBoardAdmin() {
           <TitleColorPalette color={board.notice_color ?? "#c23147"} label="[공지] 말머리 색상" />
           <button className="button button-light" disabled={busy}>공지 색상 저장</button>
         </form>
-        <NoticeForm key={board.name} busy={busy} save={(title, body) => act("notice.create", { board: board.name, title, body })} />
+        <NoticeForm key={board.name} busy={busy} save={(title, body, translations) => act("notice.create", { board: board.name, title, body, translations })} />
 
         <h3>게시판 공지 관리</h3>
         <form key={board.name} className="board-admin-prefix" onSubmit={event => {
@@ -197,7 +217,7 @@ export function CommunityBoardAdmin() {
         {posts.length === 0 && <p>표시할 공지가 없습니다.</p>}
         {posts.map(post => <details key={post.id} className="board-admin-post">
           <summary><CommunityPostTitle post={post} /></summary>
-          <NoticeForm key={post.updated_at} post={post} busy={busy} save={(title, body) => act("notice.update", { board: board.name, id: post.id, title, body })} />
+          <NoticeForm key={post.updated_at} post={post} busy={busy} save={(title, body, translations) => act("notice.update", { board: board.name, id: post.id, title, body, translations })} />
           <button className="button button-light" disabled={busy} onClick={() => {
             if (window.confirm("이 공지를 게시판에서 내릴까요?")) submit("notice.archive", { board: board.name, id: post.id });
           }}>공지 삭제</button>
@@ -211,17 +231,26 @@ export function CommunityBoardAdmin() {
 function NoticeForm({ post, busy, save }: {
   post?: AnonymousPost;
   busy: boolean;
-  save: (title: string, body: string) => Promise<void>;
+  save: (title: string, body: string, translations: AnonymousPost["notice_translations"]) => Promise<void>;
 }) {
   return <form className="standard-form" onSubmit={event => {
     event.preventDefault();
     const form = event.currentTarget;
     const fields = new FormData(form);
-    void save(String(fields.get("title") ?? "").trim(), String(fields.get("body") ?? "").trim())
+    const translations = Object.fromEntries((["vi", "en"] as const).map(locale => [locale, {
+      title: String(fields.get(`${locale}_title`) ?? "").trim(),
+      body: String(fields.get(`${locale}_body`) ?? "").trim(),
+    }]));
+    void save(String(fields.get("title") ?? "").trim(), String(fields.get("body") ?? "").trim(), translations)
       .then(() => { if (!post) form.reset(); }).catch(() => {});
   }}>
     <label>공지 제목<input name="title" minLength={2} maxLength={100} defaultValue={post?.title} required /></label>
     <label>공지 내용<textarea name="body" minLength={3} maxLength={3000} rows={4} defaultValue={post?.body} required /></label>
+    {([["vi", "베트남어"], ["en", "영어"]] as const).map(([locale, name]) => <details key={locale} className="board-admin-post" open={!!post?.notice_translations?.[locale] || undefined}>
+      <summary>{name} 공지 번역</summary>
+      <label>{name} 제목<input name={`${locale}_title`} minLength={2} maxLength={100} defaultValue={post?.notice_translations?.[locale]?.title} /></label>
+      <label>{name} 내용<textarea name={`${locale}_body`} minLength={3} maxLength={3000} rows={4} defaultValue={post?.notice_translations?.[locale]?.body} /></label>
+    </details>)}
     <button className="button button-dark" disabled={busy}>{post ? "공지 수정" : "공지 올리기"}</button>
   </form>;
 }

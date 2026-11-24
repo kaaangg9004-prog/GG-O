@@ -19,6 +19,7 @@ export interface AnonymousPost {
   topic: string;
   prefix?: CommunityPrefix | null;
   notice?: boolean;
+  notice_translations?: Partial<Record<"vi" | "en", { title: string; body: string }>>;
   notice_color?: string | null;
   pin_rank?: number | null;
   tags: string[];

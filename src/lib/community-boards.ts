@@ -9,6 +9,7 @@ export interface CommunityPrefix {
 
 export interface CommunityBoard {
   name: string;
+  labels?: Partial<Record<"ko" | "vi" | "en", string>>;
   position: number;
   active: boolean;
   notice_color?: string;
