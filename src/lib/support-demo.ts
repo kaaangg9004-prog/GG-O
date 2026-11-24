@@ -86,9 +86,17 @@ export function demoSupportGateway(current:()=>SupportMember):SupportGateway {
       if(!asAdmin)throw new Error('운영자만 답변을 등록할 수 있습니다.');requireAdmin();
       if(body.trim().length<2||body.length>5000)throw new Error('답변은 2~5,000자로 입력해 주세요.');
       const record=findTicket(id),{key,payload}=await unlockAdmin(record),now=new Date().toISOString();
+      if(record.ticket.status==='answered')throw new Error('이미 답변 완료된 문의입니다.');
       payload.replies.push({id:crypto.randomUUID(),authorId:'GG-O 운영자',body:body.trim(),createdAt:now});
-      const next={...record,ticket:{...record.ticket,status:'answered' as const,updatedAt:now},content:await seal(key,new TextEncoder().encode(JSON.stringify(payload)))};
+      const next={...record,ticket:{...record.ticket,status:'in_progress' as const,updatedAt:now},content:await seal(key,new TextEncoder().encode(JSON.stringify(payload)))};
       saveTickets(allTickets().map(r=>r.ticket.id===id?next:r));unlocked.set(id,payload);
+    },
+    async complete(id) {
+      const record=findTicket(id);
+      if(record.ticket.ownerId!==current().id)throw new Error('본인이 작성한 문의만 완료할 수 있습니다.');
+      if(record.ticket.status==='answered')return;
+      if(record.ticket.status!=='in_progress')throw new Error('운영자 답변이 등록된 문의만 완료할 수 있습니다.');
+      saveTickets(allTickets().map(r=>r.ticket.id===id?{...r,ticket:{...r.ticket,status:'answered',updatedAt:new Date().toISOString()}}:r));
     },
     async member(id,ticketId,asAdmin) {
       const record=findTicket(ticketId);authorize(record,asAdmin);

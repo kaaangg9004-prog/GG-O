@@ -21,6 +21,7 @@ export function serverSupportGateway():SupportGateway {
     create(draft:SupportDraft){validateSupportDraft(draft);return rpc<string>('create_support_ticket',{p_title:draft.title.trim(),p_body:draft.body.trim(),p_category:draft.category,p_password:draft.password});},
     open:(id,password)=>rpc<SupportConversation>('open_support_ticket',{p_ticket_id:id,p_password:password}),
     async reply(id,body){await rpc('reply_support_ticket',{p_ticket_id:id,p_body:body.trim()});},
+    async complete(id){await rpc('complete_support_ticket',{p_ticket_id:id});},
     member:id=>rpc<SupportMember>('support_member_details',{p_member_id:id}),
   };
 }

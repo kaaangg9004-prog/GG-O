@@ -4,7 +4,7 @@ export const supportCategories=['일반 문의','상품 문의','주문·배송'
 export type SupportCategory=typeof supportCategories[number];
 export interface SupportTicket {
   id:string; title:string; category:SupportCategory; ownerId:string; authorId:string;
-  createdAt:string; updatedAt:string; status:'waiting'|'answered';
+  createdAt:string; updatedAt:string; status:'waiting'|'in_progress'|'answered';
 }
 export interface SupportReply {id:string; authorId:string; body:string; createdAt:string}
 export interface SupportMember {
@@ -21,6 +21,7 @@ export interface SupportGateway {
   create(draft:SupportDraft):Promise<string>;
   open(id:string,password:string,asAdmin:boolean):Promise<SupportConversation>;
   reply(id:string,body:string,asAdmin:boolean):Promise<void>;
+  complete(id:string):Promise<void>;
   member(id:string,ticketId:string,asAdmin:boolean):Promise<SupportMember>;
 }
 export function validateSupportDraft(draft:SupportDraft) {

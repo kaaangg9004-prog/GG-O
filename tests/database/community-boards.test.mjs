@@ -292,6 +292,22 @@ test('board management preserves old posts and guards metadata changes on the se
     await adminCall(admin, 'site_admin_post_action', [old.id, 'delete', null]);
     const archived = await db.query('select topic,archived_topic from public.posts where id=$1', [old.id]);
     assert.deepEqual(archived.rows[0], { topic: null, archived_topic: '자유' });
+    const supportMigration = files.find(file => file.endsWith('_support_satisfaction_queue.sql'));
+    assert.ok(supportMigration);
+    await db.exec(readFileSync(new URL(supportMigration, directory), 'utf8'));
+    const ticket = 'b0000000-0000-4000-8000-000000000001';
+    await db.query("insert into public.support_tickets(id,user_id,title,category,body,password_hash) values($1,$2,'시험 문의','일반 문의','가상 문의 본문입니다.','fixture')", [ticket,member]);
+    const complete = actor => adminCall(actor, 'complete_support_ticket', [ticket]);
+    const supportStatus = async () => (await adminCall(member, 'list_support_tickets', [false]))[0].status;
+    await adminCall(admin, 'open_support_ticket', [ticket,'']);
+    assert.equal(await supportStatus(), 'waiting');
+    await assert.rejects(complete(member), /답변이 등록된/);
+    await adminCall(admin, 'reply_support_ticket', [ticket,'가상 답변입니다.']);
+    assert.equal(await supportStatus(), 'in_progress');
+    await assert.rejects(complete(admin), /본인이 작성한 문의만/);
+    await complete(member);
+    await complete(member);
+    assert.equal(await supportStatus(), 'answered');
   } finally {
     await db.close();
   }
