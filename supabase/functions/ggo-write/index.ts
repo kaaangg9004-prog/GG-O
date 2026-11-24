@@ -4,7 +4,7 @@ export {};
 declare const Deno:{env:{get:(name:string)=>string|undefined};serve:(handler:(request:Request)=>Promise<Response>)=>void};
 const productionOrigins=new Set(['https://www.gg-o.net','https://gg-o-kculture.fitfern517.chatgpt.site']);
 const allowed:Record<string,string[]>={
- 'post.create':['title','body','topic','prefix_id','body_size','body_color'],'post.update':['id','title','body','topic','prefix_id','body_size','body_color'],'post.delete':['id'],
+ 'post.create':['title','body','topic','prefix_id','body_size','body_color','images'],'post.update':['id','title','body','topic','prefix_id','body_size','body_color','images'],'post.delete':['id'],
  'comment.create':['post_id','body','parent_id'],'comment.update':['id','body'],'comment.delete':['id'],
  'poll_comment.create':['poll_id','body','parent_id'],'poll_comment.update':['id','body'],'poll_comment.delete':['id']
 };
@@ -36,12 +36,12 @@ export async function handleEdgeRequest(req:Request, readEnv:(name:string)=>stri
    rpc='anonymous_trusted_view';args={p_id:input.post_id,p_viewer_hash:Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('')};
   }else{
    if(user.app_metadata?.provider!=='google'||!user.identities?.some((i:{provider:string})=>i.provider==='google'))return reply(403,{error:'GGO_GOOGLE_REQUIRED'});
-   if(!input||typeof input!=='object'||Object.keys(input).some(k=>!['action','data'].includes(k))||typeof input.action!=='string'||!Object.hasOwn(allowed,input.action)||!input.data||typeof input.data!=='object'||Array.isArray(input.data)||Object.keys(input.data).some(k=>!allowed[input.action].includes(k))||Object.values(input.data).some(v=>v!==null&&typeof v!=='string'))return reply(400,{error:'GGO_INVALID_INPUT'});
+   if(!input||typeof input!=='object'||Object.keys(input).some(k=>!['action','data'].includes(k))||typeof input.action!=='string'||!Object.hasOwn(allowed,input.action)||!input.data||typeof input.data!=='object'||Array.isArray(input.data)||Object.entries(input.data).some(([k,v])=>!allowed[input.action].includes(k)||(k==='images'? !Array.isArray(v):v!==null&&typeof v!=='string')))return reply(400,{error:'GGO_INVALID_INPUT'});
    rpc='anonymous_trusted_write';args={p_actor:user.id,p_ip:null,p_action:input.action,p_data:input.data};
   }
   const response=await fetcher(url+'/rest/v1/rpc/'+rpc,{method:'POST',headers:{apikey:secret,Authorization:'Bearer '+secret,'Content-Type':'application/json'},body:JSON.stringify(args),signal:AbortSignal.timeout(10000)});
   const result=await response.json();
-  if(!response.ok)return reply(response.status===403?403:400,{error:['GGO_MEMBER_RESTRICTED','GGO_NOT_FOUND','GGO_VOTE_REQUIRED','GGO_RATE_LIMIT'].includes(result.message)?result.message:'GGO_WRITE_FAILED'});
+  if(!response.ok)return reply(response.status===403?403:400,{error:['GGO_ADMIN_REQUIRED','GGO_INVALID_INPUT','GGO_MEMBER_RESTRICTED','GGO_NOT_FOUND','GGO_VOTE_REQUIRED','GGO_RATE_LIMIT'].includes(result.message)?result.message:'GGO_WRITE_FAILED'});
   return reply(200,path==='view'?{views:result.views}:{id:result.id});
  }catch{return reply(503,{error:'GGO_SERVER_UNAVAILABLE'});}
 }

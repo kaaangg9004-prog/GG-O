@@ -135,6 +135,31 @@ test('board management preserves old posts and guards metadata changes on the se
       title: '운영자 공지', body: '운영자 게시글', topic: '자유', prefix_id: notice.id,
     }]);
     assert.equal((await read('anonymous_post', [adminNotice.id])).prefix.label, '공지');
+
+    const imageMigration = files.find(file => file.endsWith('_community_post_images.sql'));
+    assert.ok(imageMigration);
+    await db.exec(readFileSync(new URL(imageMigration, directory), 'utf8'));
+    const imagePath = 'a0000000-0000-4000-8000-000000000003.webp';
+    await db.query("insert into storage.objects(bucket_id,name,owner_id) values('community-inline-media',$1,$2)", [imagePath, member]);
+    await db.exec('grant select on storage.objects to anon');
+    const visibleImages = async () => {
+      await db.exec('set role anon');
+      try {
+        return (await db.query("select name from storage.objects where bucket_id='community-inline-media'")).rows;
+      } finally {
+        await db.exec('reset role');
+      }
+    };
+    assert.deepEqual(await visibleImages(), []);
+    const images = [{ path: imagePath, offset: 2, width: 55 }];
+    await assert.rejects(call('service_role', null, 'anonymous_trusted_write', [admin, null, 'post.update', {
+      id: adminNotice.id, title: '운영자 공지', body: '운영자 게시글', images,
+    }]), /GGO_INVALID_INPUT/);
+    await write('post.update', { id: old.id, title: '기존 게시글', body: '윗글아랫글', images });
+    assert.deepEqual((await read('anonymous_post', [old.id])).images, images);
+    assert.deepEqual(await visibleImages(), [{ name: imagePath }]);
+    await call('authenticated', admin, 'site_admin_post_action', [old.id, 'hide', null]);
+    assert.deepEqual(await visibleImages(), []);
   } finally {
     await db.close();
   }
