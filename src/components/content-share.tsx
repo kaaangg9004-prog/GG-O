@@ -18,7 +18,7 @@ export function ContentShare({ section, id, title }: { section: ShareSection; id
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [instruction, setInstruction] = useState("");
-  const input = useRef<HTMLTextAreaElement>(null);
+  const input = useRef<HTMLInputElement>(null);
   const panelId = useId();
   const origin = typeof window === "undefined" ? "https://www.gg-o.net" : window.location.origin;
   const url = contentShareUrl(origin, section, id);
@@ -56,7 +56,7 @@ export function ContentShare({ section, id, title }: { section: ShareSection; id
   const x = `https://twitter.com/intent/tweet?${new URLSearchParams({ url, text: title })}`;
   return localize(<section className="content-share" aria-label="게시글 공유">
     <div className="content-share-row">
-      <textarea ref={input} readOnly rows={2} value={url} aria-label="게시글 주소" onFocus={event => event.currentTarget.select()} />
+      <input ref={input} type="text" readOnly value={url} title={url} aria-label="게시글 주소" onFocus={event => event.currentTarget.select()} />
       <button type="button" className="button button-light content-copy" aria-label="링크 복사" title={localize.text("링크 복사")}
         onClick={() => void copy()}>{copied ? <Check size={17} /> : <Copy size={17} />}</button>
       <button type="button" className="button button-light" aria-expanded={expanded} aria-controls={panelId}

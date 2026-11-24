@@ -281,10 +281,14 @@ html[lang=vi] .header-inner>nav>a,html[lang=en] .header-inner>nav>a{font-size:12
 .community-body-editor > label { display: grid; gap: 6px; }
 .community-body-editor textarea { width: 100%; }
 .community-body-editor textarea::placeholder { color: #6c7068; opacity: 1; }
-.content-share { margin-block: 14px; min-width: 0; }
-.content-share-row { display: flex; align-items: stretch; gap: 6px; }
-.content-share-row textarea { flex: 1; min-width: 0; width: 100%; padding: 8px; border: 1px solid var(--line); font-size: 13px; resize: none; overflow-wrap: anywhere; }
+.content-share { margin-block: 10px; min-width: 0; }
+.content-share-row { display: flex; align-items: center; gap: 6px; --share-control-height: 34px; }
+.content-share-row input { flex: 1; min-width: 0; width: 100%; height: var(--share-control-height); padding: 0 9px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; text-overflow: ellipsis; }
+.content-share-row input:focus { text-overflow: clip; }
 .content-share .button { min-height: 42px; padding: 8px 10px; flex-shrink: 0; white-space: nowrap; }
+.content-share .content-share-row .button { min-height: var(--share-control-height); height: var(--share-control-height); padding: 0 9px; gap: 5px; border-radius: 6px; font-size: 12px; }
+.content-share .content-share-row .content-copy { width: var(--share-control-height); padding: 0; justify-content: center; }
+@media (pointer: coarse) { .content-share-row { --share-control-height: 38px; } }
 .content-share-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .content-share-options[hidden] { display: none; }
 .content-share-result { margin-top: 6px; font-size: 13px; }
