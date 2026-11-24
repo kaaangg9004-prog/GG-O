@@ -33,7 +33,7 @@ import { manageCommunityBoard, type CommunityBoard } from "@/lib/community-board
 import { siteAdminGateway, type ManagedMember } from "@/lib/site-admin";
 import { getPostImageUrls, isVideoAttachment, maxCommunityImages, maxCommunityVideoBytes, splitPostBody, uploadPostImage } from "@/lib/community-post-images";
 import { splitYouTubeLinks } from "@/lib/community-youtube";
-import { communityPostUrl } from "@/lib/community-post-link";
+import { ContentShare } from "./content-share";
 import { highlightHashtags } from "@/lib/community-hashtags";
 import { readProductPhoto } from "@/lib/product-images";
 import { dateLabel } from "@/lib/data";
@@ -457,8 +457,8 @@ export function MemberBoard({
               <AnonymousLabel label={selected.author_label} admin={selected.is_admin_author} />
               <time>{dateLabel(selected.created_at)}</time>
               <span>조회 {selected.views ?? 0}</span>
-              <CopyCommunityPostLink key={selected.id} id={selected.id} />
             </div>
+            <ContentShare key={`share-${selected.id}`} section="community" id={selected.id} title={translatedPost(selected).title} />
             <CommunityPostBody key={`body-${selected.id}`} post={translatedPost(selected)} />
             {selected.tags.length > 0 && <ul className="community-post-hashtags" aria-label="해시태그">
               {selected.tags.map((tag, index) => <li key={index} translate="no">{displayHashtag(tag)}</li>)}
@@ -655,27 +655,6 @@ const bodySizes: Record<BodySize, string | undefined> = {
 };
 function bodyStyle(size?: BodySize | null, color?: string | null) {
   return { fontSize: size ? bodySizes[size] : undefined, color: color ?? undefined };
-}
-function CopyCommunityPostLink({ id }: { id: string }) {
-  const localize = useLocalized();
-  const [copied, setCopied] = useState(false);
-  const [manualLink, setManualLink] = useState("");
-  const copy = async () => {
-    const link = communityPostUrl(window.location.origin, id);
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      setManualLink("");
-    } catch {
-      setCopied(false);
-      setManualLink(link);
-    }
-  };
-  return localize(<div className="community-link-copy">
-    <button className="button button-light" type="button" onClick={() => void copy()}>링크 복사</button>
-    {copied && <span role="status">링크를 복사했습니다.</span>}
-    {manualLink && <input aria-label="게시글 주소" value={manualLink} readOnly autoFocus onFocus={event => event.currentTarget.select()} />}
-  </div>);
 }
 const noPostImages: CommunityPostImage[] = [];
 function CommunityPostBody({ post }: { post: AnonymousPost }) {
