@@ -28,7 +28,7 @@ import {
   type CommunityFilter,
 } from "@/lib/community";
 import { boardCategories } from "@/lib/types";
-import type { CommunityBoard } from "@/lib/community-boards";
+import { manageCommunityBoard, type CommunityBoard } from "@/lib/community-boards";
 import { dateLabel } from "@/lib/data";
 import { useLocalized } from "./locale-provider";
 import { EmptyState, Modal } from "./ui";
@@ -94,18 +94,20 @@ export function MemberBoard({
     [settings, setSettings] = useState(defaultSiteSettings);
   const [catalog, setCatalog] = useState<CommunityBoard[] | null>(null);
   const [highlights, setHighlights] = useState<{ board: string; posts: AnonymousPost[] } | null>(null);
+  const [pinRevision, setPinRevision] = useState(0);
+  const editorOpen = editing !== undefined;
   const categories = catalog?.map(board => board.name) ?? boardCategories.slice(1);
   useEffect(() => {
     let active = true;
     void gateway?.boards?.().then(boards => { if (active) setCatalog(boards); }).catch(() => {});
     return () => { active = false; };
-  }, [gateway]);
+  }, [gateway, editorOpen]);
   useEffect(() => {
     if (compact || !catalog?.some(board => board.name === filter)) return;
     let active = true;
     void gateway?.highlights?.(filter).then(posts => { if (active) setHighlights({ board: filter, posts }); }).catch(() => {});
     return () => { active = false; };
-  }, [catalog, compact, filter, gateway]);
+  }, [catalog, compact, filter, gateway, pinRevision]);
   const fetchPosts = (before?: { created_at: string; id: string }) =>
     gateway!.feed
       ? gateway!.feed(filter, before, query)
@@ -237,6 +239,12 @@ export function MemberBoard({
       await refresh();
     });
   }, [pendingRead, authenticated, access.signed_in, gateway]);
+  const updatePin = (post: AnonymousPost, rank: number | null) => run(async () => {
+    await manageCommunityBoard("post.pin", { board: post.topic, id: post.id, rank });
+    setSelected(current => current?.id === post.id ? { ...current, pin_rank: rank } : current);
+    setPinRevision(value => value + 1);
+    await refresh();
+  });
   const promoted = !query.trim() && highlights?.board === filter ? highlights.posts : [];
   const shown = [...promoted, ...rows.filter(post => !promoted.some(pin => pin.id === post.id))]
     .filter(
@@ -410,6 +418,17 @@ export function MemberBoard({
             <div className="board-body">
               <p translate="no">{selected.body}</p>
             </div>
+            {!compact && authenticated && access.is_admin && !selected.notice && (
+              <form key={selected.id} className="board-admin-prefix" onSubmit={event => {
+                event.preventDefault();
+                void updatePin(selected, Number(new FormData(event.currentTarget).get("rank")));
+              }}>
+                <label>고정 순서<input name="rank" type="number" min={1} max={10000} required defaultValue={selected.pin_rank ?? 1} /></label>
+                <button className="button button-light" disabled={busy}>{selected.pin_rank ? "고정 순서 저장" : "상단 고정"}</button>
+                {selected.pin_rank != null && <button type="button" className="button button-light" disabled={busy}
+                  onClick={() => void updatePin(selected, null)}>고정 해제</button>}
+              </form>
+            )}
             {selected.is_mine && access.can_write && !selected.notice && (
               <div className="anonymous-owner-actions">
                 <button onClick={() => setEditing(selected)}>
@@ -540,13 +559,13 @@ function PostEditor({
           ))}
         </select>
       </label>
-      {choices.length > 0 && <label>
+      <label>
         말머리
         <select value={prefix} onChange={event => setPrefix(event.target.value)}>
           <option value="">말머리 없음</option>
           {choices.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
         </select>
-      </label>}
+      </label>
       <label>
         제목
         <input
