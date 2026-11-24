@@ -4,11 +4,18 @@ import {LocaleProvider} from '@/components/locale-provider';
 import {RankingClockProvider} from '@/components/ranking-clock';
 import {LanguageSwitcher} from '@/components/language-switcher';
 
+const googleVerification = process.env.GGO_GOOGLE_SITE_VERIFICATION?.trim();
+const naverVerification = process.env.GGO_NAVER_SITE_VERIFICATION?.trim();
+
 export const metadata: Metadata = {
   title: 'GG-O · Văn hóa Hàn và gu của bạn',
   description: 'Văn hóa Hàn, niềm vui và cộng đồng ẩn danh. GG-O có tiếng Việt, tiếng Hàn và tiếng Anh.',
   manifest: '/manifest.webmanifest',
   robots: { index: false, follow: true },
+  verification: {
+    google: googleVerification || undefined,
+    other: naverVerification ? { 'naver-site-verification': naverVerification } : undefined,
+  },
   appleWebApp: { capable: true, title: 'GG-O', statusBarStyle: 'black-translucent' },
   icons: { icon: '/icon.svg', apple: '/icon-192.png' },
 };
