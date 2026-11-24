@@ -29,7 +29,7 @@ test("a shared post opens directly and its link can be copied", async () => {
     fireEvent.click(dialog.getByRole("button", { name: "링크 복사" }));
     await dialog.findByText("링크를 복사했습니다.");
     assert.equal(copied, `${window.location.origin}/?share=community&id=${id}`);
-    assert.equal((dialog.getByRole("textbox", { name: "게시글 주소" }) as HTMLTextAreaElement).value, copied);
+    assert.equal((dialog.getByRole("textbox", { name: "게시글 주소" }) as HTMLInputElement).value, copied);
     fireEvent.click(dialog.getByRole("button", { name: "공유하기" }));
     assert.ok(dialog.getByRole("link", { name: "Facebook" }));
     assert.ok(dialog.getByRole("link", { name: "X" }));
