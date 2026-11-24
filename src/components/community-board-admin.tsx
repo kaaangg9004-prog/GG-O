@@ -35,15 +35,13 @@ export function CommunityBoardAdmin() {
 
   useEffect(() => {
     setPosts([]);
-    if (!board?.active || !gateway?.feed || !gateway.highlights) return;
+    if (!board?.active || !gateway?.highlights) return;
     let active = true;
-    void Promise.all([gateway.feed(board.name, undefined, query.trim()), gateway.highlights(board.name)])
-      .then(([rows, highlights]) => {
+    void gateway.highlights(board.name)
+      .then(rows => {
         if (!active) return;
         const matches = query.trim().toLocaleLowerCase();
-        const visible = highlights.filter(post => !matches || post.title.toLocaleLowerCase().includes(matches));
-        const seen = new Set(visible.map(post => post.id));
-        setPosts([...visible, ...rows.filter(post => !seen.has(post.id))]);
+        setPosts(rows.filter(post => post.notice && post.title.toLocaleLowerCase().includes(matches)));
       })
       .catch(reason => { if (active) setError(message(reason)); });
     return () => { active = false; };
@@ -145,31 +143,21 @@ export function CommunityBoardAdmin() {
         </form>
         <NoticeForm key={board.name} busy={busy} save={(title, body) => act("notice.create", { board: board.name, title, body })} />
 
-        <h3>게시글 상단 고정 및 공지 관리</h3>
+        <h3>게시판 공지 관리</h3>
         <form key={board.name} className="board-admin-prefix" onSubmit={event => {
           event.preventDefault();
           setQuery(String(new FormData(event.currentTarget).get("query") ?? "").trim());
         }}>
-          <label>게시글 제목 검색<input name="query" maxLength={100} /></label>
+          <label>공지 제목 검색<input name="query" maxLength={100} /></label>
           <button className="button button-light">검색</button>
         </form>
-        {posts.length === 0 && <p>표시할 게시글이 없습니다.</p>}
+        {posts.length === 0 && <p>표시할 공지가 없습니다.</p>}
         {posts.map(post => <details key={post.id} className="board-admin-post">
-          <summary><CommunityPostTitle post={post} />{post.pin_rank ? ` · 상단 고정 ${post.pin_rank}` : ""}</summary>
-          {post.notice ? <>
-            <NoticeForm key={post.updated_at} post={post} busy={busy} save={(title, body) => act("notice.update", { board: board.name, id: post.id, title, body })} />
-            <button className="button button-light" disabled={busy} onClick={() => {
-              if (window.confirm("이 공지를 게시판에서 내릴까요?")) submit("notice.archive", { board: board.name, id: post.id });
-            }}>공지 삭제</button>
-          </> : <form key={post.pin_rank} className="standard-form" onSubmit={event => {
-            event.preventDefault();
-            submit("post.pin", { board: board.name, id: post.id, rank: Number(new FormData(event.currentTarget).get("rank")) });
-          }}>
-            <label>고정 순서<input type="number" name="rank" min={1} max={10000} required defaultValue={post.pin_rank ?? 1} /></label>
-            <button className="button button-light" disabled={busy}>상단 고정 저장</button>
-            {post.pin_rank && <button type="button" className="button button-light" disabled={busy}
-              onClick={() => submit("post.pin", { board: board.name, id: post.id, rank: null })}>고정 해제</button>}
-          </form>}
+          <summary><CommunityPostTitle post={post} /></summary>
+          <NoticeForm key={post.updated_at} post={post} busy={busy} save={(title, body) => act("notice.update", { board: board.name, id: post.id, title, body })} />
+          <button className="button button-light" disabled={busy} onClick={() => {
+            if (window.confirm("이 공지를 게시판에서 내릴까요?")) submit("notice.archive", { board: board.name, id: post.id });
+          }}>공지 삭제</button>
         </details>)}
       </>}
     </>}
