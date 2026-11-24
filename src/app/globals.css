@@ -261,13 +261,28 @@ html[lang=vi] .header-inner>nav>a,html[lang=en] .header-inner>nav>a{font-size:12
 .title-color-swatches input:checked + span::after { content: "✓"; color: white; font-weight: 700; }
 .community-title-prefix { font-weight: 750; }
 .community-post-hashtags { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; list-style: none; }
-.community-post-hashtags li { padding: 3px 8px; background: #eef0e7; border-radius: 8px; overflow-wrap: anywhere; }
+.community-post-hashtags li { padding: 3px 8px; color: #1376c5; background: #edf6ff; border-radius: 8px; overflow-wrap: anywhere; }
+.community-hashtag-input { position: relative; width: 100%; min-width: 0; background: var(--paper, white); }
+.community-hashtag-input .community-hashtag-mirror,
+.community-hashtag-input input { width: 100%; padding: 10px 12px; border: 1px solid transparent; font: inherit; line-height: 1.4; letter-spacing: inherit; }
+.community-hashtag-mirror { position: absolute; inset: 0; pointer-events: none; overflow: hidden; white-space: pre; color: #161616; }
+.community-hashtag-input input { position: relative; border-color: var(--line); background: transparent; color: transparent; caret-color: #161616; }
+.community-hashtag-input input::placeholder { color: #6c7068; }
+.community-hashtag-input input::selection { background: #9cc9ef75; color: transparent; }
+.completed-hashtag { color: #1376c5; }
+@media (forced-colors: active) {
+  .community-hashtag-mirror { display: none; }
+  .community-hashtag-input input { color: CanvasText; }
+}
 .post-format-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
 .post-format-toolbar label { display: grid; gap: 4px; }
 .post-format-toolbar input[type="color"] { min-width: 48px; padding: 4px; }
 .community-body-editor { display: grid; gap: 12px; min-width: 0; }
 .community-body-editor > label { display: grid; gap: 6px; }
 .community-body-editor textarea { width: 100%; }
+.community-body-editor textarea::placeholder { color: #6c7068; opacity: 1; }
+.community-link-copy { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.community-link-copy input { width: min(100%, 22rem); }
 .community-editor-image { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); }
 .community-inline-image, .board-body > .community-inline-image { display: block; max-width: 100%; height: auto; max-height: none; object-fit: contain; }
 .community-youtube-player { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; }

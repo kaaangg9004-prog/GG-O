@@ -33,6 +33,8 @@ import { manageCommunityBoard, type CommunityBoard } from "@/lib/community-board
 import { siteAdminGateway, type ManagedMember } from "@/lib/site-admin";
 import { getPostImageUrls, isVideoAttachment, maxCommunityImages, maxCommunityVideoBytes, splitPostBody, uploadPostImage } from "@/lib/community-post-images";
 import { splitYouTubeLinks } from "@/lib/community-youtube";
+import { communityPostUrl } from "@/lib/community-post-link";
+import { highlightHashtags } from "@/lib/community-hashtags";
 import { readProductPhoto } from "@/lib/product-images";
 import { dateLabel } from "@/lib/data";
 import { useLocalized } from "./locale-provider";
@@ -48,10 +50,13 @@ const failure = (e: unknown) =>
   e instanceof Error
     ? e.message
     : "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-export function AnonymousLabel({ label }: { label: string }) {
+export function AnonymousLabel({ label, admin = false }: { label: string; admin?: boolean }) {
   const { locale } = useLocalized(),
     author = label === "Ẩn danh (Tác giả)",
     number = label.match(/^Ẩn danh (\d+)$/)?.[1];
+  if (admin) return <span className="anonymous-label is-author" translate="no">
+    {{ ko: "운영자", vi: "Quản trị viên", en: "Administrator" }[locale]}
+  </span>;
   return (
     <span
       className={author ? "anonymous-label is-author" : "anonymous-label"}
@@ -76,6 +81,7 @@ export function MemberBoard({
   compact = false,
   initialFilter = "hot",
   onManageAuthor,
+  sharedPostId,
 }: {
   gateway?: AnonymousGateway;
   authenticated?: boolean;
@@ -83,6 +89,7 @@ export function MemberBoard({
   compact?: boolean;
   initialFilter?: CommunityFilter;
   onManageAuthor?: (postId: string) => void;
+  sharedPostId?: string | null;
 }) {
   const localize = useLocalized(),
     gateway = useMemo(() => injected ?? anonymousGateway(), [injected]);
@@ -180,6 +187,9 @@ export function MemberBoard({
     let active = true;
     const sync = () => {
       if (document.hidden) return;
+      if (authenticated) void gateway.access().then(current => {
+        if (active) setAccess(current);
+      }).catch(() => {});
       const token = ++feedVersion.current;
       fetchPosts()
         .then((rows) => {
@@ -243,6 +253,10 @@ export function MemberBoard({
   const openPost = (id: string) => {
     setPendingRead(id);
   };
+  useEffect(() => {
+    setPendingRead(sharedPostId ?? null);
+    if (!sharedPostId) setSelected(null);
+  }, [sharedPostId]);
   useEffect(() => {
     if (!pendingRead || !gateway) return;
     const generation = epoch.current;
@@ -402,7 +416,7 @@ export function MemberBoard({
                 <small className="member-post-views">조회 {p.views ?? 0}</small>
               </span>
               <span className="board-author">
-                <AnonymousLabel label={p.author_label} />
+                <AnonymousLabel label={p.author_label} admin={p.is_admin_author} />
               </span>
               <time className="board-date">{dateLabel(p.created_at)}</time>
             </button>
@@ -440,11 +454,12 @@ export function MemberBoard({
             <p className="eyebrow" translate="no">{boardLabel(selected.topic)}</p>
             <h1 translate="no"><CommunityPostTitle post={translatedPost(selected)} /></h1>
             <div className="board-detail-meta">
-              <AnonymousLabel label={selected.author_label} />
+              <AnonymousLabel label={selected.author_label} admin={selected.is_admin_author} />
               <time>{dateLabel(selected.created_at)}</time>
               <span>조회 {selected.views ?? 0}</span>
+              <CopyCommunityPostLink key={selected.id} id={selected.id} />
             </div>
-            <CommunityPostBody key={selected.id} post={translatedPost(selected)} />
+            <CommunityPostBody key={`body-${selected.id}`} post={translatedPost(selected)} />
             {selected.tags.length > 0 && <ul className="community-post-hashtags" aria-label="해시태그">
               {selected.tags.map((tag, index) => <li key={index} translate="no">{displayHashtag(tag)}</li>)}
             </ul>}
@@ -641,6 +656,27 @@ const bodySizes: Record<BodySize, string | undefined> = {
 function bodyStyle(size?: BodySize | null, color?: string | null) {
   return { fontSize: size ? bodySizes[size] : undefined, color: color ?? undefined };
 }
+function CopyCommunityPostLink({ id }: { id: string }) {
+  const localize = useLocalized();
+  const [copied, setCopied] = useState(false);
+  const [manualLink, setManualLink] = useState("");
+  const copy = async () => {
+    const link = communityPostUrl(window.location.origin, id);
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setManualLink("");
+    } catch {
+      setCopied(false);
+      setManualLink(link);
+    }
+  };
+  return localize(<div className="community-link-copy">
+    <button className="button button-light" type="button" onClick={() => void copy()}>링크 복사</button>
+    {copied && <span role="status">링크를 복사했습니다.</span>}
+    {manualLink && <input aria-label="게시글 주소" value={manualLink} readOnly autoFocus onFocus={event => event.currentTarget.select()} />}
+  </div>);
+}
 const noPostImages: CommunityPostImage[] = [];
 function CommunityPostBody({ post }: { post: AnonymousPost }) {
   const images = post.images ?? noPostImages;
@@ -683,6 +719,36 @@ interface DraftPostImage {
   width: number;
 }
 const displayHashtag = (tag: string) => "#" + tag.replace(/^#+/, "");
+function HashtagInput({ value, invalid, change }: { value: string; invalid: boolean; change: (value: string) => void }) {
+  const localize = useLocalized();
+  const mirror = useRef<HTMLDivElement>(null);
+  const [editingOffset, setEditingOffset] = useState<number | null>(null);
+  const syncScroll = (input: HTMLInputElement) => {
+    if (mirror.current) mirror.current.scrollLeft = input.scrollLeft;
+  };
+  return <label>
+    {localize.text("해시태그")}
+    <div className="community-hashtag-input">
+      <div className="community-hashtag-mirror" ref={mirror} aria-hidden="true">
+        {highlightHashtags(value, editingOffset).map((part, index) =>
+          <span className={part.complete ? "completed-hashtag" : undefined} key={index}>{part.text}</span>)}
+      </div>
+      <input value={value} placeholder="#여행 #맛집" maxLength={200} aria-invalid={invalid}
+        onScroll={event => syncScroll(event.currentTarget)}
+        onSelect={event => syncScroll(event.currentTarget)}
+        onBlur={() => setEditingOffset(null)}
+        onChange={event => {
+          const input = event.currentTarget;
+          const native = event.nativeEvent as InputEvent;
+          setEditingOffset(native.inputType?.startsWith("delete") ||
+            (editingOffset !== null && !/[\s,]/.test(native.data ?? "")) ? input.selectionStart : null);
+          change(input.value);
+          syncScroll(input);
+        }} />
+    </div>
+    <small>{localize.text(invalid ? "해시태그는 최대 6개, 각 24자까지 입력할 수 있습니다." : "띄어쓰기나 쉼표로 구분해 최대 6개까지 추가할 수 있습니다.")}</small>
+  </label>;
+}
 function PostEditor({
   post,
   busy,
@@ -704,7 +770,7 @@ function PostEditor({
     [prefix, setPrefix] = useState(post?.prefix?.id ?? ""),
     [size, setSize] = useState<BodySize>(post?.body_size ?? "normal"),
     [color, setColor] = useState(post?.body_color ?? null),
-    [hashtags, setHashtags] = useState(post?.tags.map(displayHashtag).join(" ") ?? ""),
+    [hashtags, setHashtags] = useState(post?.tags.length ? post.tags.map(displayHashtag).join(" ") + " " : ""),
     [hashtagsChanged, setHashtagsChanged] = useState(false);
   const tags = Array.from(new Set(hashtags.split(/[\s,#]+/).filter(Boolean).map(tag => tag.toLowerCase())));
   const invalidHashtags = hashtagsChanged && (tags.length > 6 || tags.some(tag => [...tag].length > 24));
@@ -828,11 +894,7 @@ function PostEditor({
           required
         />
       </label>
-      <label>해시태그
-        <input value={hashtags} onChange={event => { setHashtagsChanged(true); setHashtags(event.target.value); }}
-          placeholder="#여행 #맛집" maxLength={200} aria-invalid={invalidHashtags} />
-        <small>{invalidHashtags ? "해시태그는 최대 6개, 각 24자까지 입력할 수 있습니다." : "띄어쓰기나 쉼표로 구분해 최대 6개까지 추가할 수 있습니다."}</small>
-      </label>
+      <HashtagInput value={hashtags} invalid={invalidHashtags} change={value => { setHashtagsChanged(true); setHashtags(value); }} />
       <div className="post-format-toolbar" role="group" aria-label="본문 꾸미기">
         <label>본문 글자 크기
           <select value={size} onChange={event => setSize(event.target.value as BodySize)}>
@@ -863,6 +925,7 @@ function PostEditor({
           return <Fragment key={image?.key ?? "last"}>
             <label>{images.length ? (index === 0 ? "첨부 위에 쓸 내용" : "첨부 아래에 쓸 내용") : "내용"}
               <textarea value={part} style={bodyStyle(size, color)} disabled={busy || working}
+                placeholder={index === 0 ? "유튜브 링크를 넣으면 게시글에서 바로 재생됩니다." : undefined}
                 onFocus={event => { location.current = { segment: index, offset: event.target.selectionStart }; }}
                 onSelect={event => { location.current = { segment: index, offset: event.currentTarget.selectionStart }; }}
                 onChange={event => {
@@ -1010,13 +1073,14 @@ export function AnonymousThread({
       {comments.map((c) => (
         <article key={c.id} className="board-comment">
           <div className="board-comment-meta">
-            <AnonymousLabel label={c.author_label} />
+            <AnonymousLabel label={c.author_label} admin={c.is_admin_author} />
             <time>{dateLabel(c.created_at)}</time>
           </div>
           {c.parent_id && (
             <p className="anonymous-reply-to">
               <span>답글</span> ·{" "}
               <AnonymousLabel
+                admin={comments.find((p) => p.id === c.parent_id)?.is_admin_author}
                 label={
                   comments.find((p) => p.id === c.parent_id)?.author_label ??
                   "Ẩn danh"
@@ -1167,7 +1231,7 @@ export function AnonymousThread({
           >
             {reply && (
               <div className="anonymous-reply-to">
-                <AnonymousLabel label={reply.author_label} />
+                <AnonymousLabel label={reply.author_label} admin={reply.is_admin_author} />
                 <span>에게 답글</span>
                 <button type="button" onClick={() => setReply(null)}>
                   취소

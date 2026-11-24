@@ -31,6 +31,7 @@ export interface AnonymousPost {
   comment_count: number;
   is_mine: boolean;
   author_label: string;
+  is_admin_author?: boolean;
 }
 export interface CommunityPostImage {
   path: string;
@@ -45,6 +46,7 @@ export interface AnonymousComment {
   updated_at: string;
   is_mine: boolean;
   author_label: string;
+  is_admin_author?: boolean;
 }
 export type AnonymousTarget = "post" | "comment" | "poll_comment";
 export interface AnonymousReport {

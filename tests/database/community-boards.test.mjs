@@ -219,6 +219,45 @@ test('board management preserves old posts and guards metadata changes on the se
     assert.deepEqual(await visibleImages(), [{ name: videoPath }]);
     await postAction('hide');
     assert.deepEqual(await visibleImages(), []);
+
+    const deletionMigration = files.find(file => file.endsWith('_delete_empty_community_board.sql'));
+    assert.ok(deletionMigration);
+    await db.exec(readFileSync(new URL(deletionMigration, directory), 'utf8'));
+    const deleteBoard = (board, user = admin) => call('authenticated', user, 'community_board_delete_empty', [board]);
+    await assert.rejects(deleteBoard('새 게시판', member), /GGO_ADMIN_REQUIRED/);
+    await assert.rejects(deleteBoard('사진'), /GGO_BOARD_NOT_EMPTY/);
+    await assert.rejects(deleteBoard('여행'), /GGO_BOARD_NOT_EMPTY/);
+    await deleteBoard('새 게시판');
+    assert.ok(!(await order()).includes('새 게시판'));
+    await manage('board.create', { board: '새 게시판' });
+    assert.ok((await order()).includes('새 게시판'));
+
+    const rolesMigration = files.find(file => file.endsWith('_community_admin_member_roles.sql'));
+    assert.ok(rolesMigration);
+    await db.exec(readFileSync(new URL(rolesMigration, directory), 'utf8'));
+    const adminCall = (user, name, args) => call('authenticated', user, name, args);
+    const changeRole = (actor, target, role) => adminCall(actor, 'site_admin_change_member_role', [target, role]);
+    const search = (actor, query) => adminCall(actor, 'site_admin_search_members', [query, 50, 0]);
+    assert.deepEqual((await search(admin, member + '@EXAMPLE.TEST')).map(row => row.id), [member]);
+    assert.deepEqual((await search(admin, member)).map(row => row.id), [member]);
+    await assert.rejects(search(member, '@example.test'), /GGO_ADMIN_REQUIRED/);
+    await assert.rejects(changeRole(admin, admin, 'user'), /GGO_SELF_ROLE_CHANGE/);
+    await assert.rejects(changeRole(member, admin, 'user'), /GGO_ADMIN_REQUIRED/);
+    await changeRole(admin, member, 'admin');
+    assert.equal((await adminCall(member, 'anonymous_access', [])).is_admin, true);
+    assert.equal((await search(member, admin)).length, 1);
+    await manage('board.update', { board: '새 게시판', position: 5 }, member);
+    await adminCall(admin, 'site_admin_post_action', [old.id, 'restore', null]);
+    const postByAdmin = await read('anonymous_post', [old.id]);
+    assert.equal(postByAdmin.is_admin_author, true);
+    assert.equal('user_id' in postByAdmin, false);
+    assert.equal((await read('anonymous_comments', ['post', old.id]))[0].is_admin_author, true);
+    await changeRole(admin, member, 'user');
+    assert.equal((await adminCall(member, 'anonymous_access', [])).is_admin, false);
+    await assert.rejects(search(member, admin), /GGO_ADMIN_REQUIRED/);
+    await assert.rejects(manage('board.update', { board: '새 게시판', position: 6 }, member), /GGO_ADMIN_REQUIRED/);
+    assert.equal((await read('anonymous_post', [old.id])).is_admin_author, false);
+    assert.equal((await read('anonymous_comments', ['post', old.id]))[0].is_admin_author, false);
   } finally {
     await db.close();
   }
