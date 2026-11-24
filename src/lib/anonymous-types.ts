@@ -12,6 +12,8 @@ export interface AnonymousPost {
   id: string;
   title: string;
   body: string;
+  body_size?: "small" | "normal" | "large" | "extra-large" | null;
+  body_color?: string | null;
   image_path: string;
   topic: string;
   prefix?: CommunityPrefix | null;

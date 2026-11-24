@@ -110,6 +110,31 @@ test('board management preserves old posts and guards metadata changes on the se
     await assert.rejects(read('anonymous_post', [post.id]), /GGO_NOT_FOUND/);
     await postAction('restore');
     assert.equal((await read('anonymous_post', [post.id])).title, '다음 일정');
+
+    const styleMigration = files.find(file => file.endsWith('_community_post_style.sql'));
+    assert.ok(styleMigration);
+    await db.exec(readFileSync(new URL(styleMigration, directory), 'utf8'));
+    await manage('board.create', { board: '새 게시판' });
+    const adminCatalog = await call('authenticated', admin, 'community_board_catalog', [false]);
+    const defaults = { '공지': '#c23147', '정보': '#3567c3', '핫템': '#b65b27', '사진': '#161616' };
+    for (const board of adminCatalog) {
+      for (const [label, color] of Object.entries(defaults)) {
+        assert.equal(board.prefixes.find(item => item.label === label)?.color, color);
+      }
+    }
+    const memberCatalog = await call('authenticated', member, 'community_board_catalog', [false]);
+    assert.ok(memberCatalog.every(board => board.prefixes.every(item => item.label !== '공지')));
+    const notice = adminCatalog.find(board => board.name === '자유').prefixes.find(item => item.label === '공지');
+    await assert.rejects(write('post.update', { id: old.id, title: '기존 게시글', body: '보관할 본문', prefix_id: notice.id }), /GGO_ADMIN_REQUIRED/);
+    await write('post.update', { id: old.id, title: '기존 게시글', body: '보관할 본문', body_size: 'large', body_color: '#24556b' });
+    const styled = await read('anonymous_post', [old.id]);
+    assert.equal(styled.body_size, 'large');
+    assert.equal(styled.body_color, '#24556b');
+    await assert.rejects(write('post.update', { id: old.id, title: '기존 게시글', body: '보관할 본문', body_color: 'invalid' }), /check constraint/);
+    const adminNotice = await call('service_role', null, 'anonymous_trusted_write', [admin, null, 'post.create', {
+      title: '운영자 공지', body: '운영자 게시글', topic: '자유', prefix_id: notice.id,
+    }]);
+    assert.equal((await read('anonymous_post', [adminNotice.id])).prefix.label, '공지');
   } finally {
     await db.close();
   }

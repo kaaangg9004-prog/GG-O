@@ -5,7 +5,8 @@ import { useLocalized } from "./locale-provider";
 export interface RankedArticle {
   id: string;
   title: string;
-  titleColor?: string;
+  prefix?: string;
+  prefixColor?: string;
   topic: string;
   views: number;
   comments: number;
@@ -48,10 +49,9 @@ export function TopPosts({
                 <span className="board-category">{post.topic}</span>
                 <span
                   className="top-ranking-title"
-                  style={post.titleColor ? { color: post.titleColor } : undefined}
                   translate={post.translate ?? "no"}
                 >
-                  {post.title}
+                  {post.prefix && <span className="community-title-prefix" style={{ color: post.prefixColor }}>[{post.prefix}]</span>}{post.title}
                 </span>
                 <span className="top-ranking-metrics">
                   <span>
