@@ -61,6 +61,7 @@ export function AdminConsole({
   members,
   gateway,
   authorPostId,
+  currentMemberId,
   panels,
   onSettings,
   onPost,
@@ -75,6 +76,7 @@ export function AdminConsole({
   members: ManagedMember[];
   gateway: SiteAdminGateway | null;
   authorPostId?: string;
+  currentMemberId?: string;
   panels: Partial<Record<AdminSection, ReactNode>>;
   onSettings: (value: SiteSettings) => Promise<void>;
   onPost: (
@@ -88,6 +90,7 @@ export function AdminConsole({
   const localize = useLocalized(),
     [section, setSection] = useState<AdminSection>(authorPostId ? "members" : "overview"),
     [focusedPost, setFocusedPost] = useState(authorPostId),
+    [memberQuery, setMemberQuery] = useState(""),
     [remoteStats, setStats] = useState<Record<string, number> | null>(null),
     [remotePosts, setPosts] = useState<ManagedPost[]>([]),
     [remoteMembers, setMembers] = useState<ManagedMember[]>([]),
@@ -96,7 +99,7 @@ export function AdminConsole({
     [refresh, setRefresh] = useState(0),
     [more, setMore] = useState(false),
     [confirm, setConfirm] = useState<{
-      kind: "post" | "member";
+      kind: "post" | "member" | "role";
       id: string;
       action: string;
       label: string;
@@ -123,7 +126,8 @@ export function AdminConsole({
       section === "posts"
         ? gateway.content()
         : section === "members"
-          ? focusedPost ? gateway.postAuthor(focusedPost).then(member => member ? [member] : []) : gateway.members()
+          ? focusedPost ? gateway.postAuthor(focusedPost).then(member => member ? [member] : [])
+            : memberQuery ? gateway.searchMembers(memberQuery) : gateway.members()
           : gateway.overview();
     request
       .then((value) => {
@@ -145,7 +149,7 @@ export function AdminConsole({
     return () => {
       active = false;
     };
-  }, [authorized, demo, gateway, section, refresh, focusedPost]);
+  }, [authorized, demo, gateway, section, refresh, focusedPost, memberQuery]);
   if (!authorized)
     return localize(
       <EmptyState
@@ -344,7 +348,17 @@ export function AdminConsole({
           {section === "members" && (
             <div className="admin-member-list">
               {focusedPost && <button className="button button-light" onClick={() => setFocusedPost(undefined)}>전체 회원 보기</button>}
+              {!demo && !focusedPost && <form className="board-admin-prefix" onSubmit={event => {
+                event.preventDefault();
+                const query = String(new FormData(event.currentTarget).get("member_query") ?? "").trim();
+                setMemberQuery(query);
+              }}>
+                <label>회원 검색<input type="search" name="member_query" maxLength={200} placeholder="이름, 이메일 또는 회원 ID" /></label>
+                <button className="button button-light" disabled={busy}>검색</button>
+                {memberQuery && <button className="button button-light" type="reset" disabled={busy} onClick={() => setMemberQuery("")}>검색 초기화</button>}
+              </form>}
               {focusedPost && !busy && !error && !people.length && <p>연결된 계정이 없습니다.</p>}
+              {memberQuery && !busy && !error && !people.length && <p>검색 조건에 맞는 회원이 없습니다.</p>}
               <p className="member-activity-note">댓글은 게시판 댓글과 투표 의견을 합산합니다. 받은 신고는 처리 상태와 관계없이 집계하며 위반 확정 횟수가 아닙니다.</p>
               {people.map((member) => (
                 <article key={member.id}>
@@ -373,6 +387,11 @@ export function AdminConsole({
                     {([['글 작성',member.post_count],['댓글 작성',member.comment_count],['투표 참여',member.poll_count],['누적 받은 신고',member.received_report_count]] as const).map(([label,count])=><div key={label}><dt>{label}</dt><dd>{count===undefined?'—':count.toLocaleString(localize.locale)}</dd></div>)}
                   </dl>
                   <div className="admin-member-actions">
+                    {!demo && gateway && member.id !== currentMemberId && (member.role === "admin" || member.status === "active") &&
+                      <button disabled={busy} onClick={() => setConfirm({
+                        kind: "role", id: member.id, action: member.role === "admin" ? "user" : "admin",
+                        label: member.email ?? member.handle,
+                      })}>{member.role === "admin" ? "일반회원으로 변경" : "관리자로 지정"}</button>}
                     {member.role === "admin" ? (
                       <span>운영자 보호</span>
                     ) : (
@@ -420,7 +439,7 @@ export function AdminConsole({
                     setPosts((old) => [...old, ...page]);
                     setMore(page.length === 50);
                   } else {
-                    const page = await gateway.members(remoteMembers.length);
+                    const page = memberQuery ? await gateway.searchMembers(memberQuery, remoteMembers.length) : await gateway.members(remoteMembers.length);
                     setMembers((old) => [...old, ...page]);
                     setMore(page.length === 50);
                   }
@@ -462,7 +481,11 @@ export function AdminConsole({
           <p>
             {confirm.kind === "post"
               ? "이 게시글을 삭제하시겠어요?"
-              : "선택한 회원 조치를 적용하시겠어요?"}
+              : confirm.kind === "role"
+                ? confirm.action === "admin"
+                  ? "이 회원에게 회원 정보 조회, 역할 변경을 포함한 모든 관리자 권한을 부여할까요?"
+                  : "이 회원의 관리자 권한을 모두 해제할까요?"
+                : "선택한 회원 조치를 적용하시겠어요?"}
           </p>
           <div className="admin-confirm-actions">
             <button
@@ -479,6 +502,8 @@ export function AdminConsole({
                 void run(async () => {
                   if (confirm.kind === "post")
                     await onPost(confirm.id, "delete");
+                  else if (confirm.kind === "role" && gateway)
+                    await gateway.changeMemberRole(confirm.id, confirm.action === "admin" ? "admin" : "user");
                   else
                     await onMember(confirm.id, confirm.action as MemberAction);
                   setConfirm(null);

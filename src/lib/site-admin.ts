@@ -53,6 +53,8 @@ export interface SiteAdminGateway {
   ): Promise<void>;
   comment(id: string, action: "hide" | "restore"): Promise<void>;
   members(offset?: number): Promise<ManagedMember[]>;
+  searchMembers(query: string, offset?: number): Promise<ManagedMember[]>;
+  changeMemberRole(id: string, role: ManagedMember["role"]): Promise<void>;
   postAuthor(postId: string): Promise<ManagedMember | null>;
   member(id: string, action: MemberAction): Promise<void>;
 }
@@ -84,6 +86,11 @@ export function siteAdminGateway(): SiteAdminGateway | null {
     },
     members: (offset = 0) =>
       rpc("site_admin_members", { p_limit: 50, p_offset: offset }),
+    searchMembers: (query, offset = 0) =>
+      rpc("site_admin_search_members", { p_query: query, p_limit: 50, p_offset: offset }),
+    changeMemberRole: async (id, role) => {
+      await rpc("site_admin_change_member_role", { p_id: id, p_role: role });
+    },
     postAuthor: postId => rpc("site_admin_post_author", { p_post_id: postId }),
     member: async (id, action) => {
       await rpc("site_admin_member_action", { p_id: id, p_action: action });

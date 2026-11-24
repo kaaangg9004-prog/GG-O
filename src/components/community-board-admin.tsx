@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { anonymousGateway } from "@/lib/anonymous-service";
-import { loadCommunityBoards, manageCommunityBoard, moveCommunityBoard } from "@/lib/community-boards";
+import { deleteEmptyCommunityBoard, loadCommunityBoards, manageCommunityBoard, moveCommunityBoard } from "@/lib/community-boards";
 import type { CommunityBoard } from "@/lib/community-boards";
 import type { AnonymousPost } from "@/lib/anonymous-types";
 import { CommunityPostTitle } from "./member-board";
@@ -143,7 +143,16 @@ export function CommunityBoardAdmin() {
         if (!board.active || window.confirm("게시판을 숨길까요? 기존 글과 댓글은 보관되며 다시 표시할 수 있습니다.")) {
           submit("board.update", { board: board.name, active: !board.active });
         }
-      }}>{board.active ? "게시판 삭제(숨김)" : "게시판 다시 표시"}</button>
+      }}>{board.active ? "게시판 숨김" : "게시판 다시 표시"}</button>
+      <button type="button" className="button button-light" disabled={busy} onClick={() => {
+        if (window.confirm(`‘${board.labels?.ko ?? board.name}’ 게시판을 영구 삭제할까요? 게시글이나 공지가 없는 경우에만 삭제되며, 게시판 설정과 말머리는 복구할 수 없습니다.`)) {
+          void save(async () => {
+            await deleteEmptyCommunityBoard(board.name);
+            setBoards(current => current.filter(item => item.name !== board.name));
+            setSelected(boards.find(item => item.name !== board.name)?.name ?? "");
+          }, "게시판을 영구 삭제했습니다.").catch(() => {});
+        }
+      }}>게시판 영구 삭제</button>
     </div>}
     </aside>
     <div className="standard-form board-management-content" aria-label="공지와 말머리 관리">
