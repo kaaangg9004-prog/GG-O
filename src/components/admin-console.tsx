@@ -367,7 +367,16 @@ export function AdminConsole({
                     <span>
                       {member.role === "admin" ? "운영자" : "일반 사용자"}
                     </span>
-                    <small translate="no">{member.email ?? member.id}</small>
+                    <div className="admin-member-basics">
+                      <small translate="no">{member.email ?? member.id}</small>
+                      <dl>
+                        <div><dt>이름</dt><dd translate="no">{member.name || localize.text("미제공")}</dd></div>
+                        <div><dt>성별</dt><dd>{member.gender ? { male: "남성", female: "여성", nonbinary: "논바이너리", other: "기타" }[member.gender] : "미제공"}</dd></div>
+                        <div><dt>가입일</dt><dd translate="no">{Number.isFinite(Date.parse(member.created_at))
+                          ? <time dateTime={member.created_at}>{new Intl.DateTimeFormat(localize.locale, { dateStyle: "medium", timeZone: "Asia/Seoul" }).format(new Date(member.created_at))}</time>
+                          : localize.text("미제공")}</dd></div>
+                      </dl>
+                    </div>
                   </div>
                   <span className={`member-status ${member.status}`}>
                     {member.status === "active"

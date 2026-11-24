@@ -16,6 +16,8 @@ export type DemoMemberState = {
 export type ManagedMember = {
   id: string;
   handle: string;
+  name?: string | null;
+  gender?: "male" | "female" | "nonbinary" | "other" | null;
   email: string | null;
   role: "user" | "admin";
   status: "active" | "suspended" | "banned";

@@ -26,7 +26,7 @@ test('board management preserves old posts and guards metadata changes on the se
   try {
     await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
       create schema auth; create schema storage; create schema extensions;
-      create table auth.users(id uuid primary key,email text,raw_app_meta_data jsonb not null default '{}',raw_user_meta_data jsonb not null default '{}');
+      create table auth.users(id uuid primary key,email text,created_at timestamptz not null default now(),raw_app_meta_data jsonb not null default '{}',raw_user_meta_data jsonb not null default '{}');
       create table auth.identities(user_id uuid references auth.users(id),provider text);
       create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
       create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -258,6 +258,19 @@ test('board management preserves old posts and guards metadata changes on the se
     await assert.rejects(manage('board.update', { board: '새 게시판', position: 6 }, member), /GGO_ADMIN_REQUIRED/);
     assert.equal((await read('anonymous_post', [old.id])).is_admin_author, false);
     assert.equal((await read('anonymous_comments', ['post', old.id]))[0].is_admin_author, false);
+
+    const basicInfoMigration = files.find(file => file.endsWith('_admin_member_basic_info.sql'));
+    assert.ok(basicInfoMigration);
+    await db.exec(readFileSync(new URL(basicInfoMigration, directory), 'utf8'));
+    await db.query("update auth.users set created_at=$2, raw_user_meta_data=$3 where id=$1", [member, '2026-11-20T02:00:00Z', { full_name: 'QA Sample Member', gender: 'female', phone: 'test-only' }]);
+    const [found] = await search(admin, 'sample member');
+    assert.equal(found.name, 'QA Sample Member');
+    assert.equal(found.gender, 'female');
+    assert.equal(new Date(found.created_at).toISOString(), '2026-11-20T02:00:00.000Z');
+    assert.equal('phone' in found, false);
+    assert.equal((await search(admin, admin))[0].gender, null);
+    await assert.rejects(search(member, 'sample member'), /GGO_ADMIN_REQUIRED/);
+    assert.equal((await adminCall(admin, 'site_admin_post_author', [old.id])).name, 'QA Sample Member');
   } finally {
     await db.close();
   }
