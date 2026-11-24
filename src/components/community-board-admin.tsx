@@ -22,12 +22,20 @@ const titleColors = [
   ["검정", "#161616"],
 ];
 
-function TitleColorSelect({ color, label }: { color: string; label?: string }) {
+function TitleColorPalette({ color, label }: { color: string; label: string }) {
   const current = color.toLowerCase();
-  return <select name="color" defaultValue={current} aria-label={label}>
-    {!titleColors.some(([, value]) => value === current) && <option value={current}>기존 색상 ({current})</option>}
-    {titleColors.map(([name, value]) => <option key={value} value={value}>{name}</option>)}
-  </select>;
+  const colors = titleColors.some(([, value]) => value === current)
+    ? titleColors
+    : [["기존 색상", current], ...titleColors];
+  return <fieldset className="title-color-palette">
+    <legend>{label}</legend>
+    <div className="title-color-swatches">
+      {colors.map(([name, value]) => <label key={value} title={name}>
+        <input type="radio" name="color" value={value} defaultChecked={value === current} aria-label={name} />
+        <span style={{ backgroundColor: value }} aria-hidden="true" />
+      </label>)}
+    </div>
+  </fieldset>;
 }
 
 export function CommunityBoardAdmin() {
@@ -132,7 +140,7 @@ export function CommunityBoardAdmin() {
             .then(() => form.reset()).catch(() => {});
         }}>
           <label>새 말머리<input name="label" maxLength={24} required /></label>
-          <label>제목 색상<TitleColorSelect color="#24556b" /></label>
+          <TitleColorPalette color="#24556b" label="제목 색상" />
           <button className="button button-dark" disabled={busy}>말머리 추가</button>
         </form>
         {board.prefixes.map(prefix => <form
@@ -144,7 +152,7 @@ export function CommunityBoardAdmin() {
           }}
         >
           <span style={{ color: prefix.color }}>[{prefix.label}]글제목{prefix.active ? "" : " (사용 중지)"}</span>
-          <TitleColorSelect color={prefix.color} label={prefix.label + " 제목 색상"} />
+          <TitleColorPalette color={prefix.color} label={prefix.label + " 제목 색상"} />
           <button className="button button-light" disabled={busy}>{prefix.active ? "색상 저장" : "다시 사용"}</button>
           {prefix.active && <button type="button" className="button button-light" disabled={busy} onClick={() => {
             if (window.confirm("말머리를 삭제할까요? 기존 글의 말머리는 유지됩니다.")) {
@@ -158,7 +166,7 @@ export function CommunityBoardAdmin() {
           event.preventDefault();
           submit("board.update", { board: board.name, notice_color: new FormData(event.currentTarget).get("color") });
         }}>
-          <label>[공지] 제목 색상<TitleColorSelect color={board.notice_color ?? "#a22f37"} /></label>
+          <TitleColorPalette color={board.notice_color ?? "#a22f37"} label="[공지] 제목 색상" />
           <button className="button button-light" disabled={busy}>공지 색상 저장</button>
         </form>
         <NoticeForm key={board.name} busy={busy} save={(title, body) => act("notice.create", { board: board.name, title, body })} />

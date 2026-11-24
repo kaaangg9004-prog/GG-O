@@ -250,8 +250,15 @@ html[lang=vi] .header-inner>nav>a,html[lang=en] .header-inner>nav>a{font-size:12
   align-items: center;
   flex-wrap: wrap;
 }
-.board-admin-prefix input[type="color"],
-.standard-form input[type="color"] { width: 56px; min-width: 56px; padding: 4px; }
+.title-color-palette { min-width: 0; }
+.title-color-palette legend { margin-bottom: 6px; font-weight: 600; }
+.title-color-swatches { display: flex; flex-wrap: wrap; gap: 4px; }
+.title-color-swatches label { position: relative; display: grid; place-items: center; width: 42px; height: 42px; cursor: pointer; }
+.title-color-swatches label input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.title-color-swatches label span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 5px; }
+.title-color-swatches input:focus-visible + span,
+.title-color-swatches input:checked + span { outline: 2px solid var(--ink); outline-offset: 3px; }
+.title-color-swatches input:checked + span::after { content: "✓"; color: white; font-weight: 700; }
 .board-admin-post { border: 1px solid var(--line); padding: 12px; }
 .board-admin-post summary { cursor: pointer; font-weight: 700; }
 .board-admin-post[open] summary { margin-bottom: 12px; }
