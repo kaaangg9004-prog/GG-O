@@ -60,6 +60,7 @@ export function AdminConsole({
   posts,
   members,
   gateway,
+  authorPostId,
   panels,
   onSettings,
   onPost,
@@ -73,6 +74,7 @@ export function AdminConsole({
   posts: ManagedPost[];
   members: ManagedMember[];
   gateway: SiteAdminGateway | null;
+  authorPostId?: string;
   panels: Partial<Record<AdminSection, ReactNode>>;
   onSettings: (value: SiteSettings) => Promise<void>;
   onPost: (
@@ -84,7 +86,8 @@ export function AdminConsole({
   onMember: (id: string, action: MemberAction) => Promise<void>;
 }) {
   const localize = useLocalized(),
-    [section, setSection] = useState<AdminSection>("overview"),
+    [section, setSection] = useState<AdminSection>(authorPostId ? "members" : "overview"),
+    [focusedPost, setFocusedPost] = useState(authorPostId),
     [remoteStats, setStats] = useState<Record<string, number> | null>(null),
     [remotePosts, setPosts] = useState<ManagedPost[]>([]),
     [remoteMembers, setMembers] = useState<ManagedMember[]>([]),
@@ -120,7 +123,7 @@ export function AdminConsole({
       section === "posts"
         ? gateway.content()
         : section === "members"
-          ? gateway.members()
+          ? focusedPost ? gateway.postAuthor(focusedPost).then(member => member ? [member] : []) : gateway.members()
           : gateway.overview();
     request
       .then((value) => {
@@ -142,7 +145,7 @@ export function AdminConsole({
     return () => {
       active = false;
     };
-  }, [authorized, demo, gateway, section, refresh]);
+  }, [authorized, demo, gateway, section, refresh, focusedPost]);
   if (!authorized)
     return localize(
       <EmptyState
@@ -340,6 +343,8 @@ export function AdminConsole({
           )}
           {section === "members" && (
             <div className="admin-member-list">
+              {focusedPost && <button className="button button-light" onClick={() => setFocusedPost(undefined)}>전체 회원 보기</button>}
+              {focusedPost && !busy && !error && !people.length && <p>연결된 계정이 없습니다.</p>}
               <p className="member-activity-note">댓글은 게시판 댓글과 투표 의견을 합산합니다. 받은 신고는 처리 상태와 관계없이 집계하며 위반 확정 횟수가 아닙니다.</p>
               {people.map((member) => (
                 <article key={member.id}>

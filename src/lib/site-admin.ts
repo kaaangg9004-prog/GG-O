@@ -53,6 +53,7 @@ export interface SiteAdminGateway {
   ): Promise<void>;
   comment(id: string, action: "hide" | "restore"): Promise<void>;
   members(offset?: number): Promise<ManagedMember[]>;
+  postAuthor(postId: string): Promise<ManagedMember | null>;
   member(id: string, action: MemberAction): Promise<void>;
 }
 export function siteAdminGateway(): SiteAdminGateway | null {
@@ -83,6 +84,7 @@ export function siteAdminGateway(): SiteAdminGateway | null {
     },
     members: (offset = 0) =>
       rpc("site_admin_members", { p_limit: 50, p_offset: offset }),
+    postAuthor: postId => rpc("site_admin_post_author", { p_post_id: postId }),
     member: async (id, action) => {
       await rpc("site_admin_member_action", { p_id: id, p_action: action });
     },

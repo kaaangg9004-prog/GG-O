@@ -47,6 +47,21 @@ test('board management preserves old posts and guards metadata changes on the se
     const old = await write('post.create', { title: '기존 게시글', body: '보관할 본문', topic: '자유' });
     await write('comment.create', { post_id: old.id, body: '보관할 댓글' });
     await db.exec(readFileSync(new URL(migration, directory), 'utf8'));
+    const authorMigration = files.find(file => file.endsWith('_community_post_author_admin.sql'));
+    assert.ok(authorMigration);
+    await db.exec(readFileSync(new URL(authorMigration, directory), 'utf8'));
+    const author = await call('authenticated', admin, 'site_admin_post_author', [old.id]);
+    assert.equal(author.id, member);
+    assert.equal(author.email, member + '@example.test');
+    await assert.rejects(call('authenticated', member, 'site_admin_post_author', [old.id]), /GGO_ADMIN_REQUIRED/);
+    await assert.rejects(read('site_admin_post_author', [old.id]), /permission denied/);
+    const privileges = await db.query(`select
+      has_column_privilege('authenticated','public.posts','user_id','SELECT') as member,
+      has_column_privilege('anon','public.posts','user_id','SELECT') as guest`);
+    assert.deepEqual(privileges.rows[0], { member: false, guest: false });
+    const anonymousPost = await read('anonymous_post', [old.id]);
+    assert.equal('user_id' in anonymousPost, false);
+    assert.equal('email' in anonymousPost, false);
     assert.equal((await read('anonymous_post', [old.id])).title, '기존 게시글');
     assert.equal((await read('anonymous_comments', ['post', old.id]))[0].body, '보관할 댓글');
 
@@ -81,6 +96,19 @@ test('board management preserves old posts and guards metadata changes on the se
     assert.ok(!(await read('anonymous_feed', ['전체'])).some(row => row.id === post.id));
     await assert.rejects(read('anonymous_post', [post.id]), /GGO_NOT_FOUND/);
     await manage('board.update', { board: '일정', active: true });
+    assert.equal((await read('anonymous_post', [post.id])).title, '다음 일정');
+
+    const postAction = (action, topic = null, user = admin) =>
+      call('authenticated', user, 'site_admin_post_action', [post.id, action, topic]);
+    await assert.rejects(postAction('hide', null, member), /GGO_ADMIN_REQUIRED/);
+    await postAction('category', '사진');
+    assert.equal((await read('anonymous_post', [post.id])).topic, '사진');
+    await postAction('hide');
+    await assert.rejects(read('anonymous_post', [post.id]), /GGO_NOT_FOUND/);
+    await postAction('restore');
+    await postAction('delete');
+    await assert.rejects(read('anonymous_post', [post.id]), /GGO_NOT_FOUND/);
+    await postAction('restore');
     assert.equal((await read('anonymous_post', [post.id])).title, '다음 일정');
   } finally {
     await db.close();

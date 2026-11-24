@@ -29,6 +29,7 @@ import {
 } from "@/lib/community";
 import { boardCategories } from "@/lib/types";
 import { manageCommunityBoard, type CommunityBoard } from "@/lib/community-boards";
+import { siteAdminGateway, type ManagedMember } from "@/lib/site-admin";
 import { dateLabel } from "@/lib/data";
 import { useLocalized } from "./locale-provider";
 import { EmptyState, Modal } from "./ui";
@@ -70,18 +71,21 @@ export function MemberBoard({
   onRequireAuth = () => {},
   compact = false,
   initialFilter = "hot",
+  onManageAuthor,
 }: {
   gateway?: AnonymousGateway;
   authenticated?: boolean;
   onRequireAuth?: (resume?: () => void) => void;
   compact?: boolean;
   initialFilter?: CommunityFilter;
+  onManageAuthor?: (postId: string) => void;
 }) {
   const localize = useLocalized(),
     gateway = useMemo(() => injected ?? anonymousGateway(), [injected]);
   const [rows, setRows] = useState<AnonymousPost[]>([]),
     [access, setAccess] = useState(guest),
     [selected, setSelected] = useState<AnonymousPost | null>(null),
+    [managed, setManaged] = useState<AnonymousPost | null>(null),
     [pendingRead, setPendingRead] = useState<string | null>(null),
     [editing, setEditing] = useState<AnonymousPost | null | undefined>(),
     [admin, setAdmin] = useState(false),
@@ -95,6 +99,7 @@ export function MemberBoard({
   const [catalog, setCatalog] = useState<CommunityBoard[] | null>(null);
   const [highlights, setHighlights] = useState<{ board: string; posts: AnonymousPost[] } | null>(null);
   const [pinRevision, setPinRevision] = useState(0);
+  const canManagePosts = !compact && authenticated && access.is_admin;
   const editorOpen = editing !== undefined;
   const categories = catalog?.map(board => board.name) ?? boardCategories.slice(1);
   useEffect(() => {
@@ -122,6 +127,7 @@ export function MemberBoard({
     setRows([]);
     setAccess(guest);
     setSelected(null);
+    setManaged(null);
     setEditing(undefined);
     setAdmin(false);
     setLoading(true);
@@ -239,12 +245,21 @@ export function MemberBoard({
       await refresh();
     });
   }, [pendingRead, authenticated, access.signed_in, gateway]);
-  const updatePin = (post: AnonymousPost, rank: number | null) => run(async () => {
-    await manageCommunityBoard("post.pin", { board: post.topic, id: post.id, rank });
-    setSelected(current => current?.id === post.id ? { ...current, pin_rank: rank } : current);
+  const submitManagement = async (action: "pin" | "hide" | "delete" | "category", value?: number | string | null) => {
+    if (!canManagePosts || !managed) return;
+    if (action === "pin") {
+      await manageCommunityBoard("post.pin", { board: managed.topic, id: managed.id, rank: value });
+    } else {
+      const adminGateway = siteAdminGateway();
+      if (!adminGateway) throw new Error("게시판 서버가 연결되지 않았습니다.");
+      await adminGateway.post(managed.id, action, typeof value === "string" ? value : undefined);
+      setRows(current => current.filter(post => post.id !== managed.id));
+      setHighlights(current => current && { ...current, posts: current.posts.filter(post => post.id !== managed.id) });
+    }
+    setManaged(null);
     setPinRevision(value => value + 1);
-    await refresh();
-  });
+    void refresh().catch(reason => setError(failure(reason)));
+  };
   const promoted = !query.trim() && highlights?.board === filter ? highlights.posts : [];
   const shown = [...promoted, ...rows.filter(post => !promoted.some(pin => pin.id === post.id))]
     .filter(
@@ -339,14 +354,16 @@ export function MemberBoard({
               ),
           }))}
           onOpen={openPost}
+          onManage={canManagePosts ? id => setManaged(shown.find(post => post.id === id) ?? null) : undefined}
           updatedAt={updatedAt}
         />
       ) : (
         <div className="board-list">
           {(compact ? shown.slice(0, 5) : shown).map((p) => (
+            <div className={canManagePosts ? "managed-board-row" : undefined} key={p.id}>
+            {canManagePosts && <button type="button" className="board-row-manage" aria-label={`${p.title} 관리`} onClick={() => setManaged(p)}>관리</button>}
             <button
               className="board-row"
-              key={p.id}
               onClick={() => openPost(p.id)}
             >
               <span className="board-row-main">
@@ -378,6 +395,7 @@ export function MemberBoard({
               </span>
               <time className="board-date">{dateLabel(p.created_at)}</time>
             </button>
+            </div>
           ))}
         </div>
       )}
@@ -418,17 +436,6 @@ export function MemberBoard({
             <div className="board-body">
               <p translate="no">{selected.body}</p>
             </div>
-            {!compact && authenticated && access.is_admin && !selected.notice && (
-              <form key={selected.id} className="board-admin-prefix" onSubmit={event => {
-                event.preventDefault();
-                void updatePin(selected, Number(new FormData(event.currentTarget).get("rank")));
-              }}>
-                <label>고정 순서<input name="rank" type="number" min={1} max={10000} required defaultValue={selected.pin_rank ?? 1} /></label>
-                <button className="button button-light" disabled={busy}>{selected.pin_rank ? "고정 순서 저장" : "상단 고정"}</button>
-                {selected.pin_rank != null && <button type="button" className="button button-light" disabled={busy}
-                  onClick={() => void updatePin(selected, null)}>고정 해제</button>}
-              </form>
-            )}
             {selected.is_mine && access.can_write && !selected.notice && (
               <div className="anonymous-owner-actions">
                 <button onClick={() => setEditing(selected)}>
@@ -497,6 +504,12 @@ export function MemberBoard({
           />
         </Modal>
       )}
+      {managed && canManagePosts && (
+        <BoardPostManagement post={managed} boards={catalog?.map(board => board.name) ?? []}
+          close={() => setManaged(null)} save={submitManagement}
+          openAuthor={onManageAuthor ? () => onManageAuthor(managed.id) : undefined}
+          open={() => { setManaged(null); openPost(managed.id); }} />
+      )}
       {admin && gateway && access.is_admin && (
         <Modal title="신고 관리" wide close={() => setAdmin(false)}>
           <AnonymousAdmin gateway={gateway} />
@@ -510,6 +523,83 @@ export function CommunityPostTitle({ post }: { post: AnonymousPost }) {
   return <span translate="no" style={color ? { color } : undefined}>
     {communityTitle(post)}
   </span>;
+}
+function BoardPostManagement({ post, boards, close, save, open, openAuthor }: {
+  post: AnonymousPost;
+  boards: string[];
+  close: () => void;
+  save: (action: "pin" | "hide" | "delete" | "category", value?: number | string | null) => Promise<void>;
+  open: () => void;
+  openAuthor?: () => void;
+}) {
+  const [selection, select] = useState<"rank" | "category" | "hide" | "delete" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [author, setAuthor] = useState<ManagedMember | null | undefined>();
+  const [authorError, setAuthorError] = useState("");
+  useEffect(() => {
+    const adminGateway = siteAdminGateway();
+    if (!adminGateway) return;
+    let active = true;
+    void adminGateway.postAuthor(post.id)
+      .then(account => { if (active) setAuthor(account); })
+      .catch(error => { if (active) setAuthorError(failure(error)); });
+    return () => { active = false; };
+  }, [post.id]);
+  const pinned = post.pin_rank != null;
+  const destinations = boards.filter(board => board !== post.topic);
+  const perform = async (task: () => Promise<void>) => {
+    setBusy(true);
+    setMessage("");
+    try {
+      await task();
+    } catch (error) {
+      setMessage(failure(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <Modal title="게시글 관리" close={() => { if (!busy) close(); }}>
+    <p><CommunityPostTitle post={post} /></p>
+    <p>작성자 계정{" "}
+      {author ? <button type="button" className="text-link" translate="no" disabled={busy || !openAuthor}
+        onClick={openAuthor}>{author.email ?? author.handle}</button>
+        : authorError || (author === null ? "연결된 계정 없음" : "불러오는 중…")}
+    </p>
+    <div className="board-post-actions">
+      <button className="button button-light" disabled={busy || pinned || post.notice} onClick={() => void perform(() => save("pin", 1))}>상단 고정</button>
+      <button className="button button-light" disabled={busy || !pinned || post.notice} onClick={() => void perform(() => save("pin", null))}>상단 고정 해제</button>
+      <button className="button button-light" disabled={busy} onClick={() => select("hide")}>숨김</button>
+      <button className="button button-light" disabled={busy} onClick={() => select("delete")}>삭제</button>
+      <button className="button button-light" disabled={busy || !pinned || post.notice} onClick={() => select("rank")}>고정 순서 변경</button>
+      <button className="button button-light" disabled={busy || !destinations.length} onClick={() => select("category")}>게시판 이동</button>
+      <button className="button button-light" disabled={busy} onClick={open}>글 보기</button>
+      <button className="button button-light" disabled={busy} onClick={() => void perform(async () => {
+        await navigator.clipboard.writeText(communityTitle(post));
+        setMessage("제목을 복사했습니다.");
+      })}>제목 복사</button>
+    </div>
+    {post.notice && <p>공지는 게시판 상단에 자동으로 표시됩니다.</p>}
+    {message && <p role="status">{message}</p>}
+    {selection && <form key={selection} className="standard-form" onSubmit={event => {
+      event.preventDefault();
+      const value = new FormData(event.currentTarget).get("value");
+      void perform(() => selection === "rank" ? save("pin", Number(value))
+        : selection === "category" ? save("category", String(value)) : save(selection));
+    }}>
+      {selection === "rank" && <label>고정 순서<input name="value" type="number" min={1} max={10000} defaultValue={post.pin_rank ?? 1} required /></label>}
+      {selection === "category" && <label>이동할 게시판<select name="value" required defaultValue="">
+        <option value="" disabled>게시판 선택</option>
+        {destinations.map(board => <option key={board}>{board}</option>)}
+      </select>기존 말머리와 고정은 이동할 때 해제됩니다.</label>}
+      {selection === "hide" && <p>이 글을 게시판에서 숨길까요?</p>}
+      {selection === "delete" && <p>이 글을 삭제할까요? 사이트 관리에서 복구할 수 있습니다.</p>}
+      <div className="board-post-actions">
+        <button className="button button-dark" disabled={busy}>확인</button>
+        <button type="button" className="button button-light" disabled={busy} onClick={() => select(null)}>취소</button>
+      </div>
+    </form>}
+  </Modal>;
 }
 function communityTitle(post: AnonymousPost) {
   const label = post.notice ? "공지" : post.prefix?.label;
