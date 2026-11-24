@@ -316,3 +316,4 @@ html[lang=vi] .header-inner>nav>a,html[lang=en] .header-inner>nav>a{font-size:12
 .board-row-manage{min-height:36px;padding:0 9px;margin-inline:4px;border:1px solid var(--line);font-size:12px;white-space:nowrap}
 .board-row-manage:hover{background:var(--ink);color:white}
 .board-post-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-block:12px}
+.poll-editor-cover[data-has-photo="false"] { grid-template-columns: minmax(0, 1fr); }

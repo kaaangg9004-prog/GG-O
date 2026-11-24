@@ -140,7 +140,7 @@ function MagazineEditor({
         title: "",
         tag: "",
         excerpt: "",
-        image: "/images/street.jpg",
+        image: "",
         read: "",
         paragraphs: [""],
       },
@@ -155,6 +155,7 @@ function MagazineEditor({
         e.preventDefault();
         const checked = parseMagazine({
           ...draft,
+          image: draft.image || "/images/event-placeholder.svg",
           paragraphs: body
             .split(/\n\s*\n/)
             .map((p) => p.trim())
@@ -189,11 +190,11 @@ function MagazineEditor({
           />
         </label>
       ))}
-      <img
+      {draft.image && draft.image !== "/images/event-placeholder.svg" && <img
         className="magazine-cover-preview"
         src={draft.image}
         alt="매거진 사진 미리보기"
-      />
+      />}
       <label>
         대표 사진
         <input

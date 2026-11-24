@@ -43,11 +43,11 @@ export function NewsPage({state,canManage,actor,canWrite,mutate,onRequireAuth}:{
 }
 function NewsEditor({article,onSave}:{article?:NewsArticle;onSave:(n:NewsArticle)=>boolean|Promise<boolean>}){
  const localize=useLocalized();
- const [title,setTitle]=useState(article?.title??''),[category,setCategory]=useState(article?.category??'GG-O 소식'),[body,setBody]=useState(article?.body??''),[image,setImage]=useState(article?.image??'/images/friends.jpg'),[busy,setBusy]=useState(false),[error,setError]=useState('');
- return localize(<form className="standard-form" onSubmit={async e=>{e.preventDefault();if(busy)return;setBusy(true);const saved=await onSave({id:article?.id??crypto.randomUUID(),title,category,body,image,createdAt:article?.createdAt??new Date().toISOString(),comments:article?.comments??[]});setBusy(false);if(!saved)setError('소식을 저장하지 못했습니다.');}}>
+ const [title,setTitle]=useState(article?.title??''),[category,setCategory]=useState(article?.category??'GG-O 소식'),[body,setBody]=useState(article?.body??''),[image,setImage]=useState(article?.image??''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ return localize(<form className="standard-form" onSubmit={async e=>{e.preventDefault();if(busy)return;setBusy(true);const saved=await onSave({id:article?.id??crypto.randomUUID(),title,category,body,image:image||"/images/event-placeholder.svg",createdAt:article?.createdAt??new Date().toISOString(),comments:article?.comments??[]});setBusy(false);if(!saved)setError('소식을 저장하지 못했습니다.');}}>
  <label>소식 제목<input value={title} onChange={e=>setTitle(e.target.value)} minLength={2} maxLength={100} required/></label>
  <label>소식 분류<input value={category} onChange={e=>setCategory(e.target.value)} maxLength={40} required/></label>
  <label>소식 내용<textarea value={body} onChange={e=>setBody(e.target.value)} minLength={3} maxLength={10000} rows={10} required/></label>
  <label>대표 이미지<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={async e=>{const f=e.target.files?.[0];if(!f)return;setBusy(true);try{setImage(await readProductPhoto(f));setError('');}catch{setError('이미지를 불러오지 못했습니다.');}finally{setBusy(false);}}}/></label>
- <img className="news-editor-image" src={image} alt="대표 이미지 미리보기"/>{error&&<p role="alert">{error}</p>}<button className="button button-dark" disabled={busy}>{busy?'사진 처리 중':'소식 저장'}</button></form>);
+ {image&&image!=="/images/event-placeholder.svg"&&<img className="news-editor-image" src={image} alt="대표 이미지 미리보기"/>}{error&&<p role="alert">{error}</p>}<button className="button button-dark" disabled={busy}>{busy?'사진 처리 중':'소식 저장'}</button></form>);
 }
