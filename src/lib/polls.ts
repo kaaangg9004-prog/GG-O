@@ -20,7 +20,7 @@ export const seedPolls:PollDefinition[]=products.slice(0,3).map((product,index)=
 for(const poll of seedPolls)if(poll.questions[0].options.length<2)poll.questions[0].options.push({id:'other-color',label:'다른 색상을 원해요'});
 
 export function parsePoll(value:unknown):PollDefinition|null {
-  if(!object(value)||!identifier(value.id)||!text(value.title,100,2)||!text(value.summary,1500)||!safePollImage(value.image)||!Number.isInteger(value.revision)||Number(value.revision)<1||!Array.isArray(value.questions)||value.questions.length<1||value.questions.length>3||!Array.isArray(value.blocks)||value.blocks.length>12||typeof value.active!=='boolean')return null;
+  if(!object(value)||!identifier(value.id)||!text(value.title,100,2)||!text(value.summary,1500)||!safePollImage(value.image)||!Number.isInteger(value.revision)||Number(value.revision)<1||!Array.isArray(value.questions)||value.questions.length<1||value.questions.length>5||!Array.isArray(value.blocks)||value.blocks.length>12||typeof value.active!=='boolean')return null;
   const questions:PollQuestion[]=[],blocks:PollBlock[]=[];
   for(const q of value.questions){
     if(!object(q)||!identifier(q.id)||!text(q.prompt,200,2)||!Array.isArray(q.options)||q.options.length<2||q.options.length>5)return null;

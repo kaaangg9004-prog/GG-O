@@ -35,7 +35,11 @@ test('editing voted polls preserves votes and content, while question or choice 
   state=readState(JSON.stringify(state));const opened=openLocalPoll(state,poll.id,member);assert.equal(opened.poll.title,'편집한 제목');assert.equal(opened.participants,1);assert.equal(opened.poll.blocks.length,2);assert.equal(opened.poll.revision,2);
 });
 
-test('poll definitions enforce three questions, five choices and valid detail blocks',()=>{
+test('poll definitions enforce one to five questions, five choices and valid detail blocks',()=>{
+  const questions=Array.from({length:6},(_,index)=>({...poll.questions[0],id:'question-'+index}));
+  assert.ok(parsePoll({...poll,questions:questions.slice(0,1)}));
+  assert.ok(parsePoll({...poll,questions:questions.slice(0,5)}));
+  assert.equal(parsePoll({...poll,questions}),null);
   assert.ok(parsePoll(poll));for(const patch of [{questions:[]},{questions:[...poll.questions,poll.questions[0]]},{questions:[{...poll.questions[0],options:[...poll.questions[0].options,...Array.from({length:5},(_,i)=>({id:'new-'+i,label:'보기 '+i}))]}]},{questions:[{...poll.questions[0],options:[poll.questions[0].options[0],poll.questions[0].options[0]]}]},{image:'javascript:alert(1)'},{blocks:[{id:'text',type:'script',text:'bad'}]}])assert.equal(parsePoll({...poll,...patch}),null);
 });
 
