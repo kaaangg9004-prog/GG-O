@@ -4,7 +4,8 @@ import {LocaleProvider} from '@/components/locale-provider';
 import {RankingClockProvider} from '@/components/ranking-clock';
 import {LanguageSwitcher} from '@/components/language-switcher';
 
-const googleVerification = process.env.GGO_GOOGLE_SITE_VERIFICATION?.trim();
+const googleVerification = process.env.GGO_GOOGLE_SITE_VERIFICATION?.trim()
+  || 'lqVJttjgAcdwg7MwganzpSY8_jdD7HAdCUv3kjpP7Fs';
 const naverVerification = process.env.GGO_NAVER_SITE_VERIFICATION?.trim();
 
 export const metadata: Metadata = {
