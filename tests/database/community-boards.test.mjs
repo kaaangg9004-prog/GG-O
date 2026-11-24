@@ -271,6 +271,27 @@ test('board management preserves old posts and guards metadata changes on the se
     assert.equal((await search(admin, admin))[0].gender, null);
     await assert.rejects(search(member, 'sample member'), /GGO_ADMIN_REQUIRED/);
     assert.equal((await adminCall(admin, 'site_admin_post_author', [old.id])).name, 'QA Sample Member');
+
+    await adminCall(admin, 'site_admin_post_action', [post.id, 'delete', null]);
+    const archiveMigration = files.find(file => file.endsWith('_separate_archived_community_content.sql'));
+    assert.ok(archiveMigration);
+    await db.exec(readFileSync(new URL(archiveMigration, directory), 'utf8'));
+    const listContent = (section, user = admin) => adminCall(user, 'site_admin_community_content', [section, 50, 0]);
+    await assert.rejects(listContent('deleted_posts', member), /GGO_ADMIN_REQUIRED/);
+    assert.ok((await listContent('deleted_posts')).some(item => item.id === post.id && item.topic === '사진'));
+    assert.ok(!(await listContent('posts')).some(item => item.id === post.id));
+    await deleteBoard('사진');
+    assert.ok(!(await order()).includes('사진'));
+    await assert.rejects(adminCall(admin, 'site_admin_post_action', [post.id, 'restore', null]), /GGO_RESTORE_BOARD_REQUIRED/);
+    await adminCall(admin, 'site_admin_post_action', [post.id, 'restore', '자유']);
+    assert.equal((await read('anonymous_post', [post.id])).topic, '자유');
+    const oldComment = (await listContent('comments')).find(item => item.post_title === '기존 게시글');
+    await write('comment.delete', { id: oldComment.id });
+    assert.ok((await listContent('deleted_comments')).some(item => item.id === oldComment.id));
+    assert.ok(!(await listContent('comments')).some(item => item.id === oldComment.id));
+    await adminCall(admin, 'site_admin_post_action', [old.id, 'delete', null]);
+    const archived = await db.query('select topic,archived_topic from public.posts where id=$1', [old.id]);
+    assert.deepEqual(archived.rows[0], { topic: null, archived_topic: '자유' });
   } finally {
     await db.close();
   }

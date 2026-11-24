@@ -37,6 +37,7 @@ export type ManagedPost = {
   created_at: string;
   status: string;
   deleted: boolean;
+  comment_count?: number;
   comments: {
     id: string;
     body: string;
@@ -44,9 +45,16 @@ export type ManagedPost = {
     author_label: string;
   }[];
 };
+export type ContentSection = "posts" | "deleted_posts" | "comments" | "deleted_comments";
+export type ManagedComment = ManagedPost["comments"][number] & {
+  post_title: string;
+  deleted: boolean;
+  post_deleted: boolean;
+};
 export interface SiteAdminGateway {
   overview(): Promise<Record<string, number>>;
   content(offset?: number): Promise<ManagedPost[]>;
+  communityContent?(section: ContentSection, offset?: number): Promise<ManagedPost[] | ManagedComment[]>;
   settings(value: SiteSettings): Promise<void>;
   post(
     id: string,
@@ -72,6 +80,8 @@ export function siteAdminGateway(): SiteAdminGateway | null {
     overview: () => rpc("site_admin_overview"),
     content: (offset = 0) =>
       rpc("site_admin_content", { p_limit: 50, p_offset: offset }),
+    communityContent: (section, offset = 0) =>
+      rpc("site_admin_community_content", { p_section: section, p_limit: 50, p_offset: offset }),
     settings: async (value) => {
       if (!parseSiteSettings(value)) throw anonymousError("GGO_INVALID_INPUT");
       await rpc("site_admin_settings", { p_settings: value });

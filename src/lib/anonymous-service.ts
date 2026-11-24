@@ -16,6 +16,7 @@ const errors: Record<string, string> = {
   GGO_ADMIN_REQUIRED: "운영자 권한이 필요합니다.",
   GGO_PROTECTED_ADMIN: "운영자 계정은 이 화면에서 제재할 수 없습니다.",
   GGO_SELF_ROLE_CHANGE: "본인의 운영자 권한은 직접 변경할 수 없습니다.",
+  GGO_RESTORE_BOARD_REQUIRED: "복원할 게시판을 선택해 주세요.",
   GGO_VOTE_REQUIRED: "투표에 참여한 뒤 익명 댓글을 남길 수 있습니다.",
   GGO_NOT_FOUND: "게시글 또는 댓글을 찾을 수 없습니다.",
   GGO_ALREADY_REPORTED: "이미 접수한 신고입니다.",

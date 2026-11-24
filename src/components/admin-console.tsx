@@ -15,6 +15,8 @@ import type { LocalState } from "@/lib/types";
 import { HOT_TITLE, hotEligible, parseSiteSettings } from "@/lib/community";
 import type { SiteSettings } from "@/lib/community";
 import type {
+  ContentSection,
+  ManagedComment,
   ManagedPost,
   ManagedMember,
   MemberAction,
@@ -93,6 +95,8 @@ export function AdminConsole({
     [memberQuery, setMemberQuery] = useState(""),
     [remoteStats, setStats] = useState<Record<string, number> | null>(null),
     [remotePosts, setPosts] = useState<ManagedPost[]>([]),
+    [remoteComments, setComments] = useState<ManagedComment[]>([]),
+    [contentSection, setContentSection] = useState<ContentSection>("posts"),
     [remoteMembers, setMembers] = useState<ManagedMember[]>([]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -104,7 +108,8 @@ export function AdminConsole({
       action: string;
       label: string;
     } | null>(null);
-  const [categories, setCategories] = useState<string[]>(boardCategories.slice(1));
+  const [categories, setCategories] = useState<string[]>(demo ? boardCategories.slice(1) : []);
+  const showsComments = contentSection === "comments" || contentSection === "deleted_comments";
   useEffect(() => {
     if (!authorized || demo || section !== "posts") return;
     let active = true;
@@ -118,13 +123,14 @@ export function AdminConsole({
     setError("");
     setStats(null);
     setPosts([]);
+    setComments([]);
     setMembers([]);
     setMore(false);
     if (!authorized || demo || !gateway) return;
     setBusy(true);
     const request =
       section === "posts"
-        ? gateway.content()
+        ? gateway.communityContent?.(contentSection) ?? gateway.content()
         : section === "members"
           ? focusedPost ? gateway.postAuthor(focusedPost).then(member => member ? [member] : [])
             : memberQuery ? gateway.searchMembers(memberQuery) : gateway.members()
@@ -133,7 +139,8 @@ export function AdminConsole({
       .then((value) => {
         if (!active) return;
         if (section === "posts") {
-          setPosts(value as ManagedPost[]);
+          if (showsComments) setComments(value as ManagedComment[]);
+          else setPosts(value as ManagedPost[]);
           setMore((value as unknown[]).length === 50);
         } else if (section === "members") {
           setMembers(value as ManagedMember[]);
@@ -149,7 +156,7 @@ export function AdminConsole({
     return () => {
       active = false;
     };
-  }, [authorized, demo, gateway, section, refresh, focusedPost, memberQuery]);
+  }, [authorized, demo, gateway, section, refresh, focusedPost, memberQuery, contentSection, showsComments]);
   if (!authorized)
     return localize(
       <EmptyState
@@ -186,7 +193,9 @@ export function AdminConsole({
           ).length,
         }
       : (remoteStats ?? {}),
-    rows = demo ? posts : remotePosts,
+    rows = demo || !gateway?.communityContent
+      ? (demo ? posts : remotePosts).filter(post => post.deleted === (contentSection === "deleted_posts"))
+      : remotePosts,
     people = demo ? members : remoteMembers;
   return localize(
     <section className="shell section admin-console">
@@ -315,7 +324,24 @@ export function AdminConsole({
           {section === "reports" && panels.reports}
           {section === "posts" && (
             <div className="admin-post-list">
-              {rows.length
+              <div className="board-admin-prefix" role="group" aria-label="게시글·댓글 분류">
+                {([["posts","게시글"],["deleted_posts","삭제된 게시글"],["comments","댓글"],["deleted_comments","삭제된 댓글"]] as const).map(([value,label]) =>
+                  <button key={value} type="button" className={`button ${contentSection===value ? "button-dark" : "button-light"}`}
+                    aria-pressed={contentSection===value} disabled={busy} onClick={() => setContentSection(value)}>{label}</button>
+                )}
+              </div>
+              {showsComments ? <>
+                {remoteComments.map(c => <article className="admin-post" key={c.id}>
+                  <h3 translate="no">{c.post_title}</h3>
+                  <p translate="no">{c.body}</p>
+                  <span>{c.deleted ? "삭제됨" : c.hidden || c.post_deleted ? "숨김" : "공개"}</span>
+                  <button type="button" className="button button-light" disabled={busy || c.post_deleted}
+                    onClick={() => void run(() => onComment(c.id,c.deleted || c.hidden ? "restore" : "hide"))}>
+                    {c.deleted || c.hidden ? "댓글 복원" : "댓글 숨김"}
+                  </button>
+                </article>)}
+                {!busy && !remoteComments.length && <p>표시할 댓글이 없어요.</p>}
+              </> : rows.length
                 ? rows.map((p) => (
                     <ManagedPostRow
                       key={p.id}
@@ -444,8 +470,11 @@ export function AdminConsole({
                 void run(async () => {
                   if (!gateway) return;
                   if (section === "posts") {
-                    const page = await gateway.content(remotePosts.length);
-                    setPosts((old) => [...old, ...page]);
+                    const page = gateway.communityContent
+                      ? await gateway.communityContent(contentSection, showsComments ? remoteComments.length : remotePosts.length)
+                      : await gateway.content(remotePosts.length);
+                    if (showsComments) setComments(old => [...old, ...page as ManagedComment[]]);
+                    else setPosts(old => [...old, ...page as ManagedPost[]]);
                     setMore(page.length === 50);
                   } else {
                     const page = memberQuery ? await gateway.searchMembers(memberQuery, remoteMembers.length) : await gateway.members(remoteMembers.length);
@@ -558,14 +587,14 @@ function ManagedPostRow({
         </span>
         <h3 translate="no">{post.title}</h3>
         <p>
-          조회 {post.views}회 · 댓글 {post.comments.length}개
+          조회 {post.views}회 · 댓글 {post.comment_count ?? post.comments.length}개
         </p>
       </div>
       <div className="admin-post-actions">
         <label>
           <span className="sr-only">게시글 분류</span>
           <select value={topic} onChange={(e) => setTopic(e.target.value)}>
-            {!categories.includes(post.topic) && <option value={post.topic}>{post.topic} (숨김)</option>}
+            {!categories.includes(post.topic) && <option value={post.topic}>{post.topic || "원래 게시판"} (복원할 게시판 선택)</option>}
             {categories.map((category) => (
               <option key={category} value={category}>
                 {category}
@@ -573,17 +602,18 @@ function ManagedPostRow({
             ))}
           </select>
         </label>
-        <button
+        {!post.deleted && <button
           disabled={busy || topic === post.topic}
           onClick={() => onAction("category", topic)}
         >
           분류 저장
-        </button>
+        </button>}
         <button
-          disabled={busy}
+          disabled={busy || (post.deleted && !categories.includes(topic))}
           onClick={() =>
             onAction(
               post.status === "published" && !post.deleted ? "hide" : "restore",
+              post.deleted ? topic : undefined,
             )
           }
         >
@@ -598,7 +628,7 @@ function ManagedPostRow({
           게시글 삭제
         </button>
       </div>
-      <details>
+      {post.comments.length > 0 && <details>
         <summary>댓글 관리 ({post.comments.length})</summary>
         {post.comments.map((c) => (
           <div className="admin-comment" key={c.id}>
@@ -613,7 +643,7 @@ function ManagedPostRow({
             </button>
           </div>
         ))}
-      </details>
+      </details>}
     </article>,
   );
 }
