@@ -15,10 +15,12 @@ export interface RankedArticle {
 export function TopPosts({
   posts,
   onOpen,
+  onManage,
   updatedAt,
 }: {
   posts: RankedArticle[];
   onOpen: (id: string) => void;
+  onManage?: (id: string) => void;
   updatedAt: number;
 }) {
   const localize = useLocalized();
@@ -33,7 +35,8 @@ export function TopPosts({
       </div>
       <ol className="top-ranking-list">
         {posts.map((post, index) => (
-          <li key={post.id}>
+          <li key={post.id} className={onManage ? "managed-board-row" : undefined}>
+            {onManage && <button type="button" className="board-row-manage" aria-label={`${post.title} 관리`} onClick={() => onManage(post.id)}>관리</button>}
             <button
               className="top-ranking-item"
               onClick={() => onOpen(post.id)}

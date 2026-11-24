@@ -255,3 +255,7 @@ html[lang=vi] .header-inner>nav>a,html[lang=en] .header-inner>nav>a{font-size:12
 .board-admin-post { border: 1px solid var(--line); padding: 12px; }
 .board-admin-post summary { cursor: pointer; font-weight: 700; }
 .board-admin-post[open] summary { margin-bottom: 12px; }
+.managed-board-row{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center}
+.board-row-manage{min-height:36px;padding:0 9px;margin-inline:4px;border:1px solid var(--line);font-size:12px;white-space:nowrap}
+.board-row-manage:hover{background:var(--ink);color:white}
+.board-post-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-block:12px}
