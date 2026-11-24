@@ -36,3 +36,7 @@ export async function loadCommunityBoards(manage = false): Promise<CommunityBoar
 export async function manageCommunityBoard(action: string, data: Record<string, unknown>) {
   await boardRequest("community_board_manage", { p_action: action, p_data: data });
 }
+
+export async function moveCommunityBoard(board: string, step: -1 | 1) {
+  await boardRequest("community_board_move", { p_board: board, p_step: step });
+}

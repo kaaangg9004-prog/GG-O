@@ -160,6 +160,24 @@ test('board management preserves old posts and guards metadata changes on the se
     assert.deepEqual(await visibleImages(), [{ name: imagePath }]);
     await call('authenticated', admin, 'site_admin_post_action', [old.id, 'hide', null]);
     assert.deepEqual(await visibleImages(), []);
+
+    const orderMigration = files.find(file => file.endsWith('_reorder_community_boards.sql'));
+    assert.ok(orderMigration);
+    await db.exec(readFileSync(new URL(orderMigration, directory), 'utf8'));
+    await manage('board.create', { board: '가 게시판', position: 0 });
+    await manage('board.create', { board: '나 게시판', position: 0 });
+    const order = async () => (await read('community_board_catalog', [false])).map(board => board.name);
+    const before = await order();
+    const boardIndex = before.indexOf('나 게시판');
+    const expected = [...before];
+    [expected[boardIndex - 1], expected[boardIndex]] = [expected[boardIndex], expected[boardIndex - 1]];
+    const move = (board, step, user = admin) => call('authenticated', user, 'community_board_move', [board, step]);
+    await assert.rejects(move('나 게시판', -1, member), /GGO_ADMIN_REQUIRED/);
+    await move('나 게시판', -1);
+    assert.deepEqual(await order(), expected);
+    await move('나 게시판', 1);
+    await move(before[0], -1);
+    assert.deepEqual(await order(), before);
   } finally {
     await db.close();
   }

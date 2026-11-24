@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { anonymousGateway } from "@/lib/anonymous-service";
-import { loadCommunityBoards, manageCommunityBoard } from "@/lib/community-boards";
+import { loadCommunityBoards, manageCommunityBoard, moveCommunityBoard } from "@/lib/community-boards";
 import type { CommunityBoard } from "@/lib/community-boards";
 import type { AnonymousPost } from "@/lib/anonymous-types";
 import { CommunityPostTitle } from "./member-board";
@@ -50,6 +50,7 @@ export function CommunityBoardAdmin() {
   const [error, setError] = useState("");
   const [result, setResult] = useState("");
   const board = boards.find(item => item.name === selected);
+  const boardIndex = boards.findIndex(item => item.name === selected);
 
   useEffect(() => {
     let active = true;
@@ -75,17 +76,16 @@ export function CommunityBoardAdmin() {
     return () => { active = false; };
   }, [board, gateway, query, revision]);
 
-  const act: BoardAction = async (action, data) => {
+  const save = async (task: () => Promise<void>, success: string) => {
     if (submitting.current) return;
     submitting.current = true;
     setBusy(true);
     setError("");
     setResult("");
     try {
-      await manageCommunityBoard(action, data);
-      if (action === "board.create" && typeof data.board === "string") setSelected(data.board);
+      await task();
       refresh(value => value + 1);
-      setResult("저장했습니다.");
+      setResult(success);
     } catch (reason) {
       setError(message(reason));
       throw reason;
@@ -94,7 +94,18 @@ export function CommunityBoardAdmin() {
       setBusy(false);
     }
   };
+  const act: BoardAction = (action, data) => save(async () => {
+    await manageCommunityBoard(action, data);
+    if (action === "board.create" && typeof data.board === "string") setSelected(data.board);
+  }, "저장했습니다.");
   const submit = (action: string, data: Record<string, unknown>) => { void act(action, data).catch(() => {}); };
+  const move = (step: -1 | 1) => {
+    if (!board) return;
+    void save(async () => {
+      await moveCommunityBoard(board.name, step);
+      setBoards(await loadCommunityBoards(true));
+    }, "게시판 순서를 변경했습니다.").catch(() => {});
+  };
 
   return <section className="standard-form" aria-label="게시판 관리">
     <h2>게시판 관리</h2>
@@ -119,13 +130,10 @@ export function CommunityBoardAdmin() {
     </form>
 
     {board && <div className="standard-form">
-      <form key={board.name + board.position} className="standard-form" onSubmit={event => {
-        event.preventDefault();
-        submit("board.update", { board: board.name, position: Number(new FormData(event.currentTarget).get("position")) });
-      }}>
-        <label>표시 순서 (작은 숫자가 먼저)<input type="number" name="position" min={0} max={10000} required defaultValue={board.position} /></label>
-        <button className="button button-light" disabled={busy}>게시판 순서 변경</button>
-      </form>
+      <div className="board-admin-prefix" role="group" aria-label="게시판 순서 변경">
+        <button type="button" className="button button-light" disabled={busy || boardIndex <= 0} onClick={() => move(-1)}>↑ 위로</button>
+        <button type="button" className="button button-light" disabled={busy || boardIndex >= boards.length - 1} onClick={() => move(1)}>↓ 아래로</button>
+      </div>
       <button className="button button-light" disabled={busy} onClick={() => {
         if (!board.active || window.confirm("게시판을 숨길까요? 기존 글과 댓글은 보관되며 다시 표시할 수 있습니다.")) {
           submit("board.update", { board: board.name, active: !board.active });
