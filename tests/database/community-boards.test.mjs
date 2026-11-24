@@ -207,6 +207,18 @@ test('board management preserves old posts and guards metadata changes on the se
     assert.equal(translatedNotice.title, '알려드립니다');
     assert.deepEqual(translatedNotice.notice_translations, translations);
     await assert.rejects(manage('notice.update', { board: '여행', id: translatedNotice.id, title: '알려드립니다', body: '한국어 공지 내용', translations }, member), /GGO_ADMIN_REQUIRED/);
+
+    const videoMigration = files.find(file => file.endsWith('_community_post_videos.sql'));
+    assert.ok(videoMigration);
+    await db.exec(readFileSync(new URL(videoMigration, directory), 'utf8'));
+    const videoPath = 'a0000000-0000-4000-8000-000000000004.mp4';
+    await db.query("insert into storage.objects(bucket_id,name,owner_id) values('community-inline-media',$1,$2)", [videoPath, member]);
+    const video = { path: videoPath, offset: 0, width: 100 };
+    await write('post.update', { id: post.id, title: '다음 일정', body: '영상 본문', images: [video] });
+    assert.deepEqual((await read('anonymous_post', [post.id])).images, [video]);
+    assert.deepEqual(await visibleImages(), [{ name: videoPath }]);
+    await postAction('hide');
+    assert.deepEqual(await visibleImages(), []);
   } finally {
     await db.close();
   }
