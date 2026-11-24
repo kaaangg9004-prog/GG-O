@@ -112,7 +112,9 @@ export function MemberBoard({
   const [pinRevision, setPinRevision] = useState(0);
   const canManagePosts = !compact && authenticated && access.is_admin;
   const editorOpen = editing !== undefined;
-  const categories = catalog?.map(board => board.name) ?? boardCategories.slice(1);
+  const categories = gateway?.boards
+    ? catalog?.map(board => board.name) ?? []
+    : boardCategories.slice(1);
   const boardLabel = (name: string) => catalog?.find(board => board.name === name)?.labels?.[localize.locale] ?? localize.text(name);
   const translatedPost = (post: AnonymousPost): AnonymousPost => {
     const translation = localize.locale === "ko" ? undefined : post.notice_translations?.[localize.locale];
@@ -343,6 +345,7 @@ export function MemberBoard({
           </label>
           <button
             className="button button-dark"
+            disabled={categories.length === 0}
             onClick={() => {
               if (canWrite()) setEditing(null);
             }}

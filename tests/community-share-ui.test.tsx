@@ -4,6 +4,27 @@ import test from "node:test";
 import { fireEvent, render, within } from "@testing-library/react";
 import { MemberBoard } from "../src/components/member-board";
 import type { AnonymousGateway, AnonymousPost } from "../src/lib/anonymous-types";
+import type { CommunityBoard } from "../src/lib/community-boards";
+
+test("live navigation waits for the server before showing board names", async () => {
+  let deliver!: (boards: CommunityBoard[]) => void;
+  const catalog = new Promise<CommunityBoard[]>(resolve => { deliver = resolve; });
+  const gateway = {
+    boards: () => catalog,
+    posts: async () => [],
+    access: async () => ({ signed_in: false, can_write: false, is_admin: false, status: "guest", suspended_until: null }),
+  } as unknown as AnonymousGateway;
+  const ui = render(<MemberBoard gateway={gateway} />);
+  try {
+    assert.equal(ui.queryByRole("button", { name: "음악" }), null);
+    assert.equal(ui.queryByRole("button", { name: "취미" }), null);
+    deliver([{ name: "현재 게시판", position: 0, active: true, prefixes: [] }]);
+    await ui.findByRole("button", { name: "현재 게시판" });
+    assert.equal(ui.queryByRole("button", { name: "음악" }), null);
+  } finally {
+    ui.unmount();
+  }
+});
 
 test("a shared post opens directly and its link can be copied", async () => {
   const id = "a0000000-0000-4000-8000-000000000001";

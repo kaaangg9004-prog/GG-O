@@ -21,7 +21,7 @@ async function boardRequest(name: string, args: Record<string, unknown>) {
   if (!client) throw new Error("게시판 서버가 연결되지 않았습니다.");
   const { data, error } = await client.rpc(name, args);
   if (error) {
-    if (error.message === "GGO_BOARD_NOT_EMPTY") throw new Error("보관 중인 게시글이나 공지가 있어 영구 삭제할 수 없습니다.");
+    if (error.message === "GGO_BOARD_NOT_EMPTY") throw new Error("삭제한 글이나 숨긴 글을 포함해 보관된 게시글이 있어 영구 삭제할 수 없습니다. 게시판을 숨기면 이용자에게 보이지 않습니다.");
     if (error.code === "23505") throw new Error("이미 사용 중인 이름입니다.");
     if (error.code === "42501") throw new Error("운영자 권한이 필요합니다.");
     throw new Error("게시판 요청을 처리하지 못했습니다. 입력과 연결 상태를 확인해 주세요.");
