@@ -31,7 +31,8 @@ import {
 import { boardCategories } from "@/lib/types";
 import { manageCommunityBoard, type CommunityBoard } from "@/lib/community-boards";
 import { siteAdminGateway, type ManagedMember } from "@/lib/site-admin";
-import { getPostImageUrls, maxCommunityImages, splitPostBody, uploadPostImage } from "@/lib/community-post-images";
+import { getPostImageUrls, isVideoAttachment, maxCommunityImages, maxCommunityVideoBytes, splitPostBody, uploadPostImage } from "@/lib/community-post-images";
+import { splitYouTubeLinks } from "@/lib/community-youtube";
 import { readProductPhoto } from "@/lib/product-images";
 import { dateLabel } from "@/lib/data";
 import { useLocalized } from "./locale-provider";
@@ -655,18 +656,30 @@ function CommunityPostBody({ post }: { post: AnonymousPost }) {
     {splitPostBody(post.body, images).map((part, index) => {
       const image = images[index];
       return <Fragment key={index}>
-        {part && <p translate="no" style={bodyStyle(post.body_size, post.body_color)}>{part}</p>}
-        {image && urls[image.path] && <img className="community-inline-image" src={urls[image.path]}
-          alt={`첨부 사진 ${index + 1}`} style={{ width: `${image.width}%` }} />}
+        {splitYouTubeLinks(part).map((content, position) => content.embed
+          ? <iframe key={position} className="community-youtube-player" src={content.embed}
+              title="YouTube 동영상" loading="lazy" allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+              allow="encrypted-media; picture-in-picture; fullscreen" />
+          : <p key={position} translate="no" style={bodyStyle(post.body_size, post.body_color)}>{content.text}</p>)}
+        {image && urls[image.path] && <PostAttachment source={urls[image.path]} video={isVideoAttachment(image.path)} width={image.width} index={index} />}
       </Fragment>;
     })}
   </div>;
+}
+
+function PostAttachment({ source, video, width, index }: { source: string; video: boolean; width: number; index: number }) {
+  const style = { width: `${width}%` };
+  return video
+    ? <video className="community-inline-image" src={source} controls playsInline preload="metadata" aria-label={`첨부 영상 ${index + 1}`} style={style} />
+    : <img className="community-inline-image" src={source} alt={`첨부 사진 ${index + 1}`} style={style} />;
 }
 
 interface DraftPostImage {
   key: string;
   path?: string;
   source?: string;
+  file?: File;
   width: number;
 }
 const displayHashtag = (tag: string) => "#" + tag.replace(/^#+/, "");
@@ -699,10 +712,15 @@ function PostEditor({
   const [photoError, setPhotoError] = useState("");
   const [savedUrls, setSavedUrls] = useState<Record<string, string>>({});
   const uploaded = useRef(new Map<string, string>());
+  const previews = useRef(new Set<string>());
   const input = useRef<HTMLInputElement>(null);
   const location = useRef({ segment: 0, offset: segments[0].length });
   const rawBody = segments.join("");
   const body = rawBody.trim();
+  useEffect(() => {
+    const urls = previews.current;
+    return () => { urls.forEach(url => URL.revokeObjectURL(url)); };
+  }, []);
   useEffect(() => {
     let active = true;
     void getPostImageUrls((post?.images ?? []).map(image => image.path)).then(urls => {
@@ -716,10 +734,13 @@ function PostEditor({
     setWorking(true);
     setPhotoError("");
     try {
-      const source = await readProductPhoto(file);
+      const video = ["video/mp4", "video/webm"].includes(file.type);
+      if (video && file.size > maxCommunityVideoBytes) throw new Error("영상은 파일당 20MB 이하로 선택해 주세요.");
+      const source = video ? URL.createObjectURL(file) : await readProductPhoto(file);
+      if (video) previews.current.add(source);
       const text = segments[segment];
       setSegments([...segments.slice(0, segment), text.slice(0, offset), text.slice(offset), ...segments.slice(segment + 1)]);
-      setImages([...images.slice(0, segment), { key: crypto.randomUUID(), source, width: 100 }, ...images.slice(segment)]);
+      setImages([...images.slice(0, segment), { key: crypto.randomUUID(), source, file: video ? file : undefined, width: 100 }, ...images.slice(segment)]);
       location.current = { segment: segment + 1, offset: 0 };
     } catch (reason) {
       setPhotoError(failure(reason));
@@ -728,6 +749,8 @@ function PostEditor({
     }
   };
   const removeImage = (index: number) => {
+    const source = images[index].source;
+    if (source && previews.current.delete(source)) URL.revokeObjectURL(source);
     setImages(images.filter((_, i) => i !== index));
     setSegments([...segments.slice(0, index), segments[index] + segments[index + 1], ...segments.slice(index + 2)]);
     location.current = { segment: index, offset: segments[index].length };
@@ -753,7 +776,7 @@ function PostEditor({
         offset += Array.from(segments[index]).length;
         let path = image.path ?? uploaded.current.get(image.key);
         if (!path && image.source) {
-          path = await uploadPostImage(image.source);
+          path = await uploadPostImage(image.file ?? image.source);
           uploaded.current.set(image.key, path);
         }
         if (!path) throw new Error("첨부 사진을 저장하지 못했습니다.");
@@ -823,20 +846,22 @@ function PostEditor({
       <div className="community-body-editor">
         <div className="post-format-toolbar">
           <button type="button" className="button button-light" disabled={busy || working || images.length >= maxCommunityImages}
-            onClick={() => input.current?.click()}>사진 추가</button>
-          <input hidden ref={input} type="file" accept="image/jpeg,image/png,image/webp"
+            onClick={() => input.current?.click()}>사진·영상 추가</button>
+          <input hidden ref={input} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,.mp4,.webm"
             onChange={event => {
               const file = event.target.files?.[0];
               event.target.value = "";
               if (file) void insertImage(file);
             }} />
-          <span>본문에 커서를 놓고 사진을 추가하세요. {images.length}/{maxCommunityImages}</span>
+          <span>본문에 커서를 놓고 첨부하세요. 영상은 MP4·WebM, 파일당 20MB까지입니다. {images.length}/{maxCommunityImages}</span>
         </div>
         {segments.map((part, index) => {
           const image = images[index];
           const source = image?.source ?? (image?.path ? savedUrls[image.path] : undefined);
+          const video = !!image?.file || (!!image?.path && isVideoAttachment(image.path));
+          const mediaLabel = video ? "영상" : "사진";
           return <Fragment key={image?.key ?? "last"}>
-            <label>{images.length ? (index === 0 ? "사진 위에 쓸 내용" : "사진 아래에 쓸 내용") : "내용"}
+            <label>{images.length ? (index === 0 ? "첨부 위에 쓸 내용" : "첨부 아래에 쓸 내용") : "내용"}
               <textarea value={part} style={bodyStyle(size, color)} disabled={busy || working}
                 onFocus={event => { location.current = { segment: index, offset: event.target.selectionStart }; }}
                 onSelect={event => { location.current = { segment: index, offset: event.currentTarget.selectionStart }; }}
@@ -848,9 +873,9 @@ function PostEditor({
                 maxLength={Math.max(part.length, 3000 - (rawBody.length - part.length))} rows={images.length ? 4 : 10} />
             </label>
             {image && <div className="community-editor-image">
-              {source && <img className="community-inline-image" src={source} alt={`첨부 사진 ${index + 1} 미리보기`} style={{ width: `${image.width}%` }} />}
+              {source && <PostAttachment source={source} video={video} width={image.width} index={index} />}
               <div className="post-format-toolbar">
-                <label>사진 너비 {image.width}%
+                <label>{mediaLabel} 너비 {image.width}%
                   <input type="range" min={25} max={100} step={5} value={image.width} disabled={busy || working}
                     onChange={event => {
                       const width = Number(event.target.value);
@@ -858,10 +883,10 @@ function PostEditor({
                     }} />
                 </label>
                 <button className="button button-light" type="button" disabled={busy || working || !part}
-                  onClick={() => moveImageAcrossText(index, "up")}>사진 위로</button>
+                  onClick={() => moveImageAcrossText(index, "up")}>{mediaLabel} 위로</button>
                 <button className="button button-light" type="button" disabled={busy || working || !segments[index + 1]}
-                  onClick={() => moveImageAcrossText(index, "down")}>사진 아래로</button>
-                <button className="button button-light" type="button" disabled={busy || working} onClick={() => removeImage(index)}>사진 삭제</button>
+                  onClick={() => moveImageAcrossText(index, "down")}>{mediaLabel} 아래로</button>
+                <button className="button button-light" type="button" disabled={busy || working} onClick={() => removeImage(index)}>{mediaLabel} 삭제</button>
               </div>
             </div>}
           </Fragment>;
