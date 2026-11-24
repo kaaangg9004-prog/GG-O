@@ -155,7 +155,7 @@ export default function Experience({authenticated=false,onRequireAuth=()=>{},onL
   const posts=visiblePosts(data),activePost=posts.find(post=>post.id===selectedPost);
   const report=(target:ReportTarget,reason:ReportReason,detail:string)=>{if(!authenticated){onRequireAuth(()=>{});return false;}const saved=mutate(state=>addReport(state,target,reason,detail,accountId??ownerKey));if(saved)notify(!target.commentId&&postReportCount(data,target.postId)+1===AUTO_HIDE_REPORTS?'신고가 50건 누적되어 게시글을 우선 숨겼습니다. 운영자 검토를 기다려 주세요.':'신고가 접수됐습니다. 같은 내용은 한 번만 신고할 수 있습니다.');return saved;};
   const pending=data.reports.filter(report=>report.status==='pending').length;
-  const homePolls=(remotePolls??polls).slice(0,4).map(poll=>({...poll,title:polls.some(seed=>seed.id===poll.id&&isPresetPollText(seed,poll.title))?localize.text(poll.title):poll.title}));
+  const homePolls=(liveBoard ? remotePolls ?? [] : polls).slice(0,4).map(poll=>({...poll,title:polls.some(seed=>seed.id===poll.id&&isPresetPollText(seed,poll.title))?localize.text(poll.title):poll.title}));
   const openArticle=(item:MagazineArticle)=>{if(liveBoard&&journalGateway)journalGateway.open(item.id).then(setArticle).catch(()=>notify('매거진을 불러오지 못했습니다.'));else setArticle(item);};
   useEffect(()=>{
     if(!sharedArticleId)return;
