@@ -292,6 +292,7 @@ html[lang=vi] .header-inner>nav>a,html[lang=en] .header-inner>nav>a{font-size:12
 .content-share-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .content-share-options[hidden] { display: none; }
 .content-share-result { margin-top: 6px; font-size: 13px; }
+.poll-editor-cover[data-has-photo="false"] { grid-template-columns: minmax(0, 1fr); }
 .community-editor-image { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); }
 .community-inline-image, .board-body > .community-inline-image { display: block; max-width: 100%; height: auto; max-height: none; object-fit: contain; }
 .community-youtube-player { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; }

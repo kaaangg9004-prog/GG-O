@@ -1,4 +1,4 @@
-const CACHE = 'ggo-static-v4';
+const CACHE = 'ggo-static-v5';
 const SHELL = ['/offline.html', '/icon.svg', '/manifest.webmanifest'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)));

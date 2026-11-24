@@ -1,0 +1,144 @@
+{
+  "rewrites": [
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/beauty-pink.jpg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/beauty.jpg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/cafe.jpg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/cap-beige.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/cap.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/community.jpg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/concert.jpg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/friends.jpg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/keyring-black.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/keyring-white.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/keyring.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/portrait.jpg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/pouch-black.en.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/pouch-black.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/pouch-black.vi.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/pouch.en.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/pouch.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/pouch.vi.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/seoul.jpg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/street.jpg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tint-cherry.en.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tint-cherry.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tint-cherry.vi.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tint-peach.en.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tint-peach.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tint-peach.vi.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tint.en.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tint.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tint.vi.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tote-black.en.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tote-black.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tote-black.vi.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tote.en.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tote.svg"
+    },
+    {
+      "destination": "/images/event-placeholder.svg",
+      "source": "/public/images/tote.vi.svg"
+    }
+  ]
+}
