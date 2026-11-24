@@ -9,6 +9,26 @@ import { CommunityPostTitle } from "./member-board";
 
 type BoardAction = (action: string, data: Record<string, unknown>) => Promise<void>;
 const message = (error: unknown) => error instanceof Error ? error.message : "게시판 요청에 실패했습니다.";
+const titleColors = [
+  ["빨강", "#a22f37"],
+  ["주황", "#a44910"],
+  ["노랑", "#856300"],
+  ["초록", "#26723e"],
+  ["파랑", "#2456aa"],
+  ["남색", "#28377c"],
+  ["보라", "#76399a"],
+  ["청록", "#24556b"],
+  ["회색", "#545864"],
+  ["검정", "#161616"],
+];
+
+function TitleColorSelect({ color, label }: { color: string; label?: string }) {
+  const current = color.toLowerCase();
+  return <select name="color" defaultValue={current} aria-label={label}>
+    {!titleColors.some(([, value]) => value === current) && <option value={current}>기존 색상 ({current})</option>}
+    {titleColors.map(([name, value]) => <option key={value} value={value}>{name}</option>)}
+  </select>;
+}
 
 export function CommunityBoardAdmin() {
   const gateway = useMemo(anonymousGateway, []);
@@ -112,7 +132,7 @@ export function CommunityBoardAdmin() {
             .then(() => form.reset()).catch(() => {});
         }}>
           <label>새 말머리<input name="label" maxLength={24} required /></label>
-          <label>제목 색상<input type="color" name="color" defaultValue="#24556b" /></label>
+          <label>제목 색상<TitleColorSelect color="#24556b" /></label>
           <button className="button button-dark" disabled={busy}>말머리 추가</button>
         </form>
         {board.prefixes.map(prefix => <form
@@ -124,7 +144,7 @@ export function CommunityBoardAdmin() {
           }}
         >
           <span style={{ color: prefix.color }}>[{prefix.label}]글제목{prefix.active ? "" : " (사용 중지)"}</span>
-          <input type="color" name="color" defaultValue={prefix.color} aria-label={prefix.label + " 제목 색상"} />
+          <TitleColorSelect color={prefix.color} label={prefix.label + " 제목 색상"} />
           <button className="button button-light" disabled={busy}>{prefix.active ? "색상 저장" : "다시 사용"}</button>
           {prefix.active && <button type="button" className="button button-light" disabled={busy} onClick={() => {
             if (window.confirm("말머리를 삭제할까요? 기존 글의 말머리는 유지됩니다.")) {
@@ -138,7 +158,7 @@ export function CommunityBoardAdmin() {
           event.preventDefault();
           submit("board.update", { board: board.name, notice_color: new FormData(event.currentTarget).get("color") });
         }}>
-          <label>[공지] 제목 색상<input name="color" type="color" defaultValue={board.notice_color ?? "#a22f37"} /></label>
+          <label>[공지] 제목 색상<TitleColorSelect color={board.notice_color ?? "#a22f37"} /></label>
           <button className="button button-light" disabled={busy}>공지 색상 저장</button>
         </form>
         <NoticeForm key={board.name} busy={busy} save={(title, body) => act("notice.create", { board: board.name, title, body })} />
