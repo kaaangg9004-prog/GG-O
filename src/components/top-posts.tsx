@@ -5,6 +5,7 @@ import { useLocalized } from "./locale-provider";
 export interface RankedArticle {
   id: string;
   title: string;
+  titleColor?: string;
   topic: string;
   views: number;
   comments: number;
@@ -44,6 +45,7 @@ export function TopPosts({
                 <span className="board-category">{post.topic}</span>
                 <span
                   className="top-ranking-title"
+                  style={post.titleColor ? { color: post.titleColor } : undefined}
                   translate={post.translate ?? "no"}
                 >
                   {post.title}

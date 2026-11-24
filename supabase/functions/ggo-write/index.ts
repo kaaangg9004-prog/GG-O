@@ -2,16 +2,18 @@ export {};
 // Supabase Edge entrypoint. Identity is verified by Auth on every request.
 // IP headers have no documented trust guarantee here: do not store them.
 declare const Deno:{env:{get:(name:string)=>string|undefined};serve:(handler:(request:Request)=>Promise<Response>)=>void};
-const origin='https://gg-o-kculture.fitfern517.chatgpt.site';
+const productionOrigins=new Set(['https://www.gg-o.net','https://gg-o-kculture.fitfern517.chatgpt.site']);
 const allowed:Record<string,string[]>={
- 'post.create':['title','body','topic'],'post.update':['id','title','body','topic'],'post.delete':['id'],
+ 'post.create':['title','body','topic','prefix_id'],'post.update':['id','title','body','topic','prefix_id'],'post.delete':['id'],
  'comment.create':['post_id','body','parent_id'],'comment.update':['id','body'],'comment.delete':['id'],
  'poll_comment.create':['poll_id','body','parent_id'],'poll_comment.update':['id','body'],'poll_comment.delete':['id']
 };
 export async function handleEdgeRequest(req:Request, readEnv:(name:string)=>string|undefined=(name)=>Deno.env.get(name), fetcher:typeof fetch=fetch){
- const headers={'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin','Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'Authorization, Content-Type, apikey','Access-Control-Allow-Methods':'POST, OPTIONS'};
+ const origin=req.headers.get('origin');
+ const headers={'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin','Access-Control-Allow-Headers':'Authorization, Content-Type, apikey','Access-Control-Allow-Methods':'POST, OPTIONS'};
  const reply=(status:number,data:unknown)=>new Response(JSON.stringify(data),{status,headers});
- if(req.headers.get('origin')!==origin)return reply(403,{error:'GGO_ORIGIN_DENIED'});
+ if(!origin||!productionOrigins.has(origin))return reply(403,{error:'GGO_ORIGIN_DENIED'});
+ Object.assign(headers,{'Access-Control-Allow-Origin':origin});
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers});
  if(req.method!=='POST')return reply(405,{error:'GGO_METHOD_DENIED'});
  const path=new URL(req.url).pathname.split('/').pop();if(path!=='write'&&path!=='view')return reply(404,{error:'GGO_NOT_FOUND'});

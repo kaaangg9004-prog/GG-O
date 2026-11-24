@@ -1,6 +1,7 @@
 import {backendConfig} from './backend-config';
 import { parseSiteSettings } from "./community";
 import { getSupabase } from "./supabase-service";
+import { loadCommunityBoards } from "./community-boards";
 import type {
   AnonymousComment,
   AnonymousGateway,
@@ -45,6 +46,10 @@ function postDTO(value: unknown): AnonymousPost {
     body: v.body,
     image_path: v.image_path ?? "",
     topic: v.topic,
+    prefix: v.prefix && /^#[0-9a-f]{6}$/i.test(v.prefix.color) ? v.prefix : null,
+    notice: v.notice === true,
+    notice_color: v.notice_color && /^#[0-9a-f]{6}$/i.test(v.notice_color) ? v.notice_color : null,
+    pin_rank: v.pin_rank ?? null,
     tags: Array.isArray(v.tags)
       ? v.tags.filter((t) => typeof t === "string")
       : [],
@@ -91,6 +96,12 @@ export function anonymousGateway(): AnonymousGateway | null {
   };
   return {
     access: () => rpc("anonymous_access"),
+    boards: () => loadCommunityBoards(),
+    highlights: async (board) => {
+      const rows = await rpc("community_board_highlights", { p_board: board });
+      if (!Array.isArray(rows)) throw anonymousError("invalid");
+      return rows.map(postDTO);
+    },
     settings: async () => {
       const settings = parseSiteSettings(await rpc("community_settings"));
       if (!settings) throw anonymousError("invalid");

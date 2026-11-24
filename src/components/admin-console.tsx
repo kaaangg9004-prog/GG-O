@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { boardCategories } from "@/lib/types";
+import { loadCommunityBoards } from "@/lib/community-boards";
 import type { LocalState } from "@/lib/types";
 import { HOT_TITLE, hotEligible, parseSiteSettings } from "@/lib/community";
 import type { SiteSettings } from "@/lib/community";
@@ -25,6 +26,7 @@ import { EmptyState, Modal } from "./ui";
 export type AdminSection =
   | "overview"
   | "posts"
+  | "boards"
   | "reports"
   | "polls"
   | "events"
@@ -36,6 +38,7 @@ export type AdminSection =
 const sections: [AdminSection, string][] = [
   ["overview", "운영 현황"],
   ["posts", "게시글·댓글"],
+  ["boards", "게시판 관리"],
   ["reports", "신고 처리"],
   ["polls", "투표 관리"],
   ["events", "이벤트 관리"],
@@ -95,6 +98,15 @@ export function AdminConsole({
       action: string;
       label: string;
     } | null>(null);
+  const [categories, setCategories] = useState<string[]>(boardCategories.slice(1));
+  useEffect(() => {
+    if (!authorized || demo || section !== "posts") return;
+    let active = true;
+    void loadCommunityBoards().then(boards => {
+      if (active) setCategories(boards.map(board => board.name));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [authorized, demo, section]);
   useEffect(() => {
     let active = true;
     setError("");
@@ -302,6 +314,7 @@ export function AdminConsole({
                       key={p.id}
                       post={p}
                       busy={busy}
+                      categories={categories}
                       onAction={(action, topic) => {
                         if (action === "delete")
                           setConfirm({
@@ -433,7 +446,7 @@ export function AdminConsole({
               }}
             />
           )}
-          {["polls", "events", "journal", "support", "emergency"].includes(
+          {["polls", "events", "journal", "support", "emergency", "boards"].includes(
             section,
           ) && panels[section]}
         </div>
@@ -478,11 +491,13 @@ export function AdminConsole({
 function ManagedPostRow({
   post,
   busy,
+  categories,
   onAction,
   onComment,
 }: {
   post: ManagedPost;
   busy: boolean;
+  categories: string[];
   onAction: (
     action: "hide" | "restore" | "delete" | "category",
     topic?: string,
@@ -511,7 +526,8 @@ function ManagedPostRow({
         <label>
           <span className="sr-only">게시글 분류</span>
           <select value={topic} onChange={(e) => setTopic(e.target.value)}>
-            {boardCategories.slice(1).map((category) => (
+            {!categories.includes(post.topic) && <option value={post.topic}>{post.topic} (숨김)</option>}
+            {categories.map((category) => (
               <option key={category} value={category}>
                 {category}
               </option>

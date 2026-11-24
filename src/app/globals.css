@@ -243,3 +243,15 @@ html[lang=vi] .header-inner>nav>a,html[lang=en] .header-inner>nav>a{font-size:12
 .home-feed-priority .section-heading { gap: 12px; }
 .home-feed-priority .section-heading h2 { font-size: 22px; }
 .home-feed-priority .section-heading .text-link { white-space: nowrap; }
+
+.board-admin-prefix {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.board-admin-prefix input[type="color"],
+.standard-form input[type="color"] { width: 56px; min-width: 56px; padding: 4px; }
+.board-admin-post { border: 1px solid var(--line); padding: 12px; }
+.board-admin-post summary { cursor: pointer; font-weight: 700; }
+.board-admin-post[open] summary { margin-bottom: 12px; }

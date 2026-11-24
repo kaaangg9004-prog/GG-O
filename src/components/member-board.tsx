@@ -28,6 +28,7 @@ import {
   type CommunityFilter,
 } from "@/lib/community";
 import { boardCategories } from "@/lib/types";
+import type { CommunityBoard } from "@/lib/community-boards";
 import { dateLabel } from "@/lib/data";
 import { useLocalized } from "./locale-provider";
 import { EmptyState, Modal } from "./ui";
@@ -89,8 +90,22 @@ export function MemberBoard({
     [busy, setBusy] = useState(false),
     [more, setMore] = useState(false),
     [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<CommunityFilter>(initialFilter),
+  const [filter, setFilter] = useState<string>(initialFilter),
     [settings, setSettings] = useState(defaultSiteSettings);
+  const [catalog, setCatalog] = useState<CommunityBoard[] | null>(null);
+  const [highlights, setHighlights] = useState<{ board: string; posts: AnonymousPost[] } | null>(null);
+  const categories = catalog?.map(board => board.name) ?? boardCategories.slice(1);
+  useEffect(() => {
+    let active = true;
+    void gateway?.boards?.().then(boards => { if (active) setCatalog(boards); }).catch(() => {});
+    return () => { active = false; };
+  }, [gateway]);
+  useEffect(() => {
+    if (compact || !catalog?.some(board => board.name === filter)) return;
+    let active = true;
+    void gateway?.highlights?.(filter).then(posts => { if (active) setHighlights({ board: filter, posts }); }).catch(() => {});
+    return () => { active = false; };
+  }, [catalog, compact, filter, gateway]);
   const fetchPosts = (before?: { created_at: string; id: string }) =>
     gateway!.feed
       ? gateway!.feed(filter, before, query)
@@ -222,7 +237,8 @@ export function MemberBoard({
       await refresh();
     });
   }, [pendingRead, authenticated, access.signed_in, gateway]);
-  const shown = rows
+  const promoted = !query.trim() && highlights?.board === filter ? highlights.posts : [];
+  const shown = [...promoted, ...rows.filter(post => !promoted.some(pin => pin.id === post.id))]
     .filter(
       (p) =>
         gateway?.feed ||
@@ -238,7 +254,7 @@ export function MemberBoard({
         p.topic === filter,
     )
     .filter((p) =>
-      (p.title + " " + p.body)
+      (p.title + " " + p.body + " " + (p.prefix?.label ?? ""))
         .toLocaleLowerCase()
         .includes(query.trim().toLocaleLowerCase()),
     );
@@ -264,6 +280,7 @@ export function MemberBoard({
           value={filter}
           onChange={setFilter}
           settings={settings}
+          categories={["전체", ...categories]}
         />
       )}
       {!compact && (
@@ -298,7 +315,8 @@ export function MemberBoard({
         <TopPosts
           posts={(compact ? shown.slice(0, 5) : shown).map((p) => ({
             id: p.id,
-            title: p.title,
+            title: communityTitle(p),
+            titleColor: communityTitleColor(p),
             topic: p.topic,
             views: p.views ?? 0,
             comments: p.comment_count,
@@ -326,7 +344,7 @@ export function MemberBoard({
               <span className="board-row-main">
                 <span className="board-category">{p.topic}</span>
                 <span className="board-title" translate="no">
-                  {p.title}
+                  <CommunityPostTitle post={p} />
                 </span>
                 <span className="board-comment-number">
                   [{p.comment_count}]
@@ -383,7 +401,7 @@ export function MemberBoard({
         <Modal title="게시글" wide close={() => setSelected(null)}>
           <article className="board-detail">
             <p className="eyebrow">{selected.topic} 게시판</p>
-            <h1 translate="no">{selected.title}</h1>
+            <h1 translate="no"><CommunityPostTitle post={selected} /></h1>
             <div className="board-detail-meta">
               <AnonymousLabel label={selected.author_label} />
               <time>{dateLabel(selected.created_at)}</time>
@@ -392,7 +410,7 @@ export function MemberBoard({
             <div className="board-body">
               <p translate="no">{selected.body}</p>
             </div>
-            {selected.is_mine && access.can_write && (
+            {selected.is_mine && access.can_write && !selected.notice && (
               <div className="anonymous-owner-actions">
                 <button onClick={() => setEditing(selected)}>
                   <Pencil size={15} />글 수정
@@ -438,7 +456,9 @@ export function MemberBoard({
             key={editing?.id ?? "new"}
             post={editing ?? undefined}
             busy={busy}
-            onSave={(title, body, topic) =>
+            boards={catalog ?? categories.map(name => ({ name, position: 0, active: true, prefixes: [] }))}
+            initialBoard={categories.includes(filter) ? filter : categories[0]}
+            onSave={(title, body, topic, prefix) =>
               run(async () => {
                 const result = await gateway.write(
                   editing ? "post.update" : "post.create",
@@ -447,6 +467,7 @@ export function MemberBoard({
                     title,
                     body,
                     topic,
+                    ...(prefix !== undefined ? { prefix_id: prefix } : {}),
                   },
                 );
                 setEditing(undefined);
@@ -465,37 +486,67 @@ export function MemberBoard({
     </section>,
   );
 }
+export function CommunityPostTitle({ post }: { post: AnonymousPost }) {
+  const color = communityTitleColor(post);
+  return <span translate="no" style={color ? { color } : undefined}>
+    {communityTitle(post)}
+  </span>;
+}
+function communityTitle(post: AnonymousPost) {
+  const label = post.notice ? "공지" : post.prefix?.label;
+  return label ? `[${label}]${post.title}` : post.title;
+}
+function communityTitleColor(post: AnonymousPost) {
+  return post.notice ? post.notice_color ?? "#a22f37" : post.prefix?.color;
+}
 function PostEditor({
   post,
   busy,
+  boards,
+  initialBoard,
   onSave,
 }: {
   post?: AnonymousPost;
   busy: boolean;
-  onSave: (title: string, body: string, topic: string) => Promise<void>;
+  boards: CommunityBoard[];
+  initialBoard?: string;
+  onSave: (title: string, body: string, topic: string, prefix?: string | null) => Promise<void>;
 }) {
   const localize = useLocalized(),
     [title, setTitle] = useState(post?.title ?? ""),
     [body, setBody] = useState(post?.body ?? ""),
-    [topic, setTopic] = useState(post?.topic ?? "자유");
+    [topic, setTopic] = useState(post?.topic ?? initialBoard ?? ""),
+    [prefix, setPrefix] = useState(post?.prefix?.id ?? "");
+  const prefixes = boards.find(board => board.name === topic)?.prefixes ?? [];
+  const originalPrefix = topic === post?.topic ? post.prefix : null;
+  const choices = originalPrefix && !prefixes.some(item => item.id === originalPrefix.id)
+    ? [...prefixes, originalPrefix] : prefixes;
   return localize(
     <form
       className="standard-form"
       onSubmit={(e) => {
         e.preventDefault();
-        void onSave(title.trim(), body.trim(), topic);
+        const hadPrefix = !!post?.prefix;
+        void onSave(title.trim(), body.trim(), topic, prefix || (hadPrefix ? null : undefined));
       }}
     >
       <label>
         게시판 분류
-        <select value={topic} onChange={(e) => setTopic(e.target.value)}>
-          {boardCategories.slice(1).map((c) => (
-            <option key={c} value={c}>
-              {c}
+        <select value={topic} onChange={(e) => { setTopic(e.target.value); setPrefix(""); }} required>
+          {boards.map((board) => (
+            <option key={board.name} value={board.name}>
+              {board.name}
             </option>
           ))}
         </select>
       </label>
+      {choices.length > 0 && <label>
+        말머리
+        <select value={prefix} onChange={event => setPrefix(event.target.value)}>
+          <option value="">말머리 없음</option>
+          {choices.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+        </select>
+      </label>}
       <label>
         제목
         <input
@@ -519,7 +570,7 @@ function PostEditor({
       </label>
       <button
         className="button button-dark"
-        disabled={busy || title.trim().length < 2 || body.trim().length < 3}
+        disabled={busy || !topic || title.trim().length < 2 || body.trim().length < 3}
       >
         {busy ? "저장 중" : "저장하기"}
       </button>

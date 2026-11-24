@@ -4,13 +4,15 @@ import { boardCategories } from "@/lib/types";
 import { HOT_TITLE } from "@/lib/community";
 import type { CommunityFilter, SiteSettings } from "@/lib/community";
 import { useLocalized } from "./locale-provider";
-export function CommunityNavigation({
+export function CommunityNavigation<T extends string = CommunityFilter>({
   value,
   onChange,
   settings,
+  categories = boardCategories as unknown as readonly T[],
 }: {
-  value: CommunityFilter;
-  onChange: (value: CommunityFilter) => void;
+  value: T | "hot";
+  onChange: (value: T | "hot") => void;
+  categories?: readonly T[];
   settings: SiteSettings;
   hotCount?: number;
 }) {
@@ -30,7 +32,7 @@ export function CommunityNavigation({
           <Flame size={14} />
           {HOT_TITLE}
         </button>
-        {boardCategories.map((category) => (
+        {categories.map((category) => (
           <button
             key={category}
             aria-pressed={value === category}
