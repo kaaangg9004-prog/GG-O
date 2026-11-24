@@ -44,6 +44,12 @@ function postDTO(value: unknown): AnonymousPost {
     id: v.id,
     title: v.title,
     body: v.body,
+    body_size: v.body_size,
+    body_color: v.body_color && /^#[0-9a-f]{6}$/i.test(v.body_color) ? v.body_color : null,
+    images: Array.isArray(v.images) ? v.images.filter(image => image &&
+      /^[0-9a-f-]{36}\.(webp|png|jpg)$/.test(image.path) &&
+      Number.isInteger(image.offset) && image.offset >= 0 &&
+      Number.isInteger(image.width) && image.width >= 25 && image.width <= 100) : [],
     image_path: v.image_path ?? "",
     topic: v.topic,
     prefix: v.prefix && /^#[0-9a-f]{6}$/i.test(v.prefix.color) ? v.prefix : null,

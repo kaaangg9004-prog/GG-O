@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   Flag,
   MessageSquare,
@@ -17,6 +17,7 @@ import type {
   AnonymousPost,
   AnonymousReport,
   AnonymousTarget,
+  CommunityPostImage,
 } from "@/lib/anonymous-types";
 import { TopPosts, useRankingClock } from "./top-posts";
 import { CommunityNavigation } from "./community-navigation";
@@ -30,6 +31,8 @@ import {
 import { boardCategories } from "@/lib/types";
 import { manageCommunityBoard, type CommunityBoard } from "@/lib/community-boards";
 import { siteAdminGateway, type ManagedMember } from "@/lib/site-admin";
+import { getPostImageUrls, maxCommunityImages, splitPostBody, uploadPostImage } from "@/lib/community-post-images";
+import { readProductPhoto } from "@/lib/product-images";
 import { dateLabel } from "@/lib/data";
 import { useLocalized } from "./locale-provider";
 import { EmptyState, Modal } from "./ui";
@@ -434,9 +437,7 @@ export function MemberBoard({
               <time>{dateLabel(selected.created_at)}</time>
               <span>조회 {selected.views ?? 0}</span>
             </div>
-            <div className="board-body">
-              <p translate="no" style={bodyStyle(selected.body_size, selected.body_color)}>{selected.body}</p>
-            </div>
+            <CommunityPostBody key={selected.id} post={selected} />
             {selected.is_mine && access.can_write && !selected.notice && (
               <div className="anonymous-owner-actions">
                 <button onClick={() => setEditing(selected)}>
@@ -485,7 +486,7 @@ export function MemberBoard({
             busy={busy}
             boards={catalog ?? categories.map(name => ({ name, position: 0, active: true, prefixes: [] }))}
             initialBoard={categories.includes(filter) ? filter : categories[0]}
-            onSave={(title, body, topic, prefix, size, color) =>
+            onSave={(title, body, topic, prefix, size, color, images) =>
               run(async () => {
                 const result = await gateway.write(
                   editing ? "post.update" : "post.create",
@@ -496,6 +497,7 @@ export function MemberBoard({
                     topic,
                     body_size: size,
                     body_color: color,
+                    images,
                     ...(prefix !== undefined ? { prefix_id: prefix } : {}),
                   },
                 );
@@ -625,6 +627,35 @@ const bodySizes: Record<BodySize, string | undefined> = {
 function bodyStyle(size?: BodySize | null, color?: string | null) {
   return { fontSize: size ? bodySizes[size] : undefined, color: color ?? undefined };
 }
+const noPostImages: CommunityPostImage[] = [];
+function CommunityPostBody({ post }: { post: AnonymousPost }) {
+  const images = post.images ?? noPostImages;
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let active = true;
+    void getPostImageUrls(images.map(image => image.path)).then(result => {
+      if (active) setUrls(result);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [images]);
+  return <div className="board-body">
+    {splitPostBody(post.body, images).map((part, index) => {
+      const image = images[index];
+      return <Fragment key={index}>
+        {part && <p translate="no" style={bodyStyle(post.body_size, post.body_color)}>{part}</p>}
+        {image && urls[image.path] && <img className="community-inline-image" src={urls[image.path]}
+          alt={`첨부 사진 ${index + 1}`} style={{ width: `${image.width}%` }} />}
+      </Fragment>;
+    })}
+  </div>;
+}
+
+interface DraftPostImage {
+  key: string;
+  path?: string;
+  source?: string;
+  width: number;
+}
 function PostEditor({
   post,
   busy,
@@ -636,15 +667,87 @@ function PostEditor({
   busy: boolean;
   boards: CommunityBoard[];
   initialBoard?: string;
-  onSave: (title: string, body: string, topic: string, prefix: string | null | undefined, size: BodySize | null, color: string | null) => Promise<void>;
+  onSave: (title: string, body: string, topic: string, prefix: string | null | undefined, size: BodySize | null, color: string | null, images: CommunityPostImage[]) => Promise<void>;
 }) {
   const localize = useLocalized(),
     [title, setTitle] = useState(post?.title ?? ""),
-    [body, setBody] = useState(post?.body ?? ""),
+    [segments, setSegments] = useState(() => splitPostBody(post?.body ?? "", post?.images ?? noPostImages)),
+    [images, setImages] = useState<DraftPostImage[]>(() => (post?.images ?? []).map((image, index) => ({ ...image, key: `${image.path}-${index}` }))),
     [topic, setTopic] = useState(post?.topic ?? initialBoard ?? ""),
     [prefix, setPrefix] = useState(post?.prefix?.id ?? ""),
     [size, setSize] = useState<BodySize>(post?.body_size ?? "normal"),
     [color, setColor] = useState(post?.body_color ?? null);
+  const [working, setWorking] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+  const [savedUrls, setSavedUrls] = useState<Record<string, string>>({});
+  const uploaded = useRef(new Map<string, string>());
+  const input = useRef<HTMLInputElement>(null);
+  const location = useRef({ segment: 0, offset: segments[0].length });
+  const rawBody = segments.join("");
+  const body = rawBody.trim();
+  useEffect(() => {
+    let active = true;
+    void getPostImageUrls((post?.images ?? []).map(image => image.path)).then(urls => {
+      if (active) setSavedUrls(urls);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [post?.images]);
+  const insertImage = async (file: File) => {
+    if (images.length >= maxCommunityImages) return;
+    const { segment, offset } = location.current;
+    setWorking(true);
+    setPhotoError("");
+    try {
+      const source = await readProductPhoto(file);
+      const text = segments[segment];
+      setSegments([...segments.slice(0, segment), text.slice(0, offset), text.slice(offset), ...segments.slice(segment + 1)]);
+      setImages([...images.slice(0, segment), { key: crypto.randomUUID(), source, width: 100 }, ...images.slice(segment)]);
+      location.current = { segment: segment + 1, offset: 0 };
+    } catch (reason) {
+      setPhotoError(failure(reason));
+    } finally {
+      setWorking(false);
+    }
+  };
+  const removeImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
+    setSegments([...segments.slice(0, index), segments[index] + segments[index + 1], ...segments.slice(index + 2)]);
+    location.current = { segment: index, offset: segments[index].length };
+  };
+  const moveImageAcrossText = (index: number, direction: "up" | "down") => {
+    const combined = segments[index] + segments[index + 1];
+    setSegments(current => current.map((part, position) => {
+      if (position === index) return direction === "up" ? "" : combined;
+      if (position === index + 1) return direction === "up" ? combined : "";
+      return part;
+    }));
+    location.current = { segment: index + 1, offset: 0 };
+  };
+  const submitPost = async () => {
+    if (working || busy) return;
+    setPhotoError("");
+    setWorking(true);
+    try {
+      const placements = [];
+      const leading = Array.from(rawBody).length - Array.from(rawBody.trimStart()).length;
+      let offset = -leading;
+      for (const [index, image] of images.entries()) {
+        offset += Array.from(segments[index]).length;
+        let path = image.path ?? uploaded.current.get(image.key);
+        if (!path && image.source) {
+          path = await uploadPostImage(image.source);
+          uploaded.current.set(image.key, path);
+        }
+        if (!path) throw new Error("첨부 사진을 저장하지 못했습니다.");
+        placements.push({ path, offset: Math.max(0, Math.min(offset, Array.from(body).length)), width: image.width });
+      }
+      await onSave(title.trim(), body, topic, prefix || (post?.prefix ? null : undefined), size === "normal" ? null : size, color, placements);
+    } catch (reason) {
+      setPhotoError(failure(reason));
+    } finally {
+      setWorking(false);
+    }
+  };
   const prefixes = boards.find(board => board.name === topic)?.prefixes ?? [];
   const originalPrefix = topic === post?.topic ? post.prefix : null;
   const choices = originalPrefix && !prefixes.some(item => item.id === originalPrefix.id)
@@ -654,8 +757,7 @@ function PostEditor({
       className="standard-form"
       onSubmit={(e) => {
         e.preventDefault();
-        const hadPrefix = !!post?.prefix;
-        void onSave(title.trim(), body.trim(), topic, prefix || (hadPrefix ? null : undefined), size === "normal" ? null : size, color);
+        void submitPost();
       }}
     >
       <label>
@@ -695,23 +797,59 @@ function PostEditor({
         <label>본문 글자색<input type="color" value={color ?? "#161616"} onChange={event => setColor(event.target.value)} /></label>
         <button type="button" className="button button-light" onClick={() => { setSize("normal"); setColor(null); }}>기본 서식</button>
       </div>
-      <label>
-        내용
-        <textarea
-          value={body}
-          style={bodyStyle(size, color)}
-          onChange={(e) => setBody(e.target.value)}
-          minLength={3}
-          maxLength={3000}
-          rows={12}
-          required
-        />
-      </label>
+      <div className="community-body-editor">
+        <div className="post-format-toolbar">
+          <button type="button" className="button button-light" disabled={busy || working || images.length >= maxCommunityImages}
+            onClick={() => input.current?.click()}>사진 추가</button>
+          <input hidden ref={input} type="file" accept="image/jpeg,image/png,image/webp"
+            onChange={event => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void insertImage(file);
+            }} />
+          <span>본문에 커서를 놓고 사진을 추가하세요. {images.length}/{maxCommunityImages}</span>
+        </div>
+        {segments.map((part, index) => {
+          const image = images[index];
+          const source = image?.source ?? (image?.path ? savedUrls[image.path] : undefined);
+          return <Fragment key={image?.key ?? "last"}>
+            <label>{images.length ? (index === 0 ? "사진 위에 쓸 내용" : "사진 아래에 쓸 내용") : "내용"}
+              <textarea value={part} style={bodyStyle(size, color)} disabled={busy || working}
+                onFocus={event => { location.current = { segment: index, offset: event.target.selectionStart }; }}
+                onSelect={event => { location.current = { segment: index, offset: event.currentTarget.selectionStart }; }}
+                onChange={event => {
+                  location.current = { segment: index, offset: event.target.selectionStart };
+                  const text = event.target.value;
+                  setSegments(current => current.map((value, i) => i === index ? text : value));
+                }}
+                maxLength={Math.max(part.length, 3000 - (rawBody.length - part.length))} rows={images.length ? 4 : 10} />
+            </label>
+            {image && <div className="community-editor-image">
+              {source && <img className="community-inline-image" src={source} alt={`첨부 사진 ${index + 1} 미리보기`} style={{ width: `${image.width}%` }} />}
+              <div className="post-format-toolbar">
+                <label>사진 너비 {image.width}%
+                  <input type="range" min={25} max={100} step={5} value={image.width} disabled={busy || working}
+                    onChange={event => {
+                      const width = Number(event.target.value);
+                      setImages(current => current.map((item, i) => i === index ? { ...item, width } : item));
+                    }} />
+                </label>
+                <button className="button button-light" type="button" disabled={busy || working || !part}
+                  onClick={() => moveImageAcrossText(index, "up")}>사진 위로</button>
+                <button className="button button-light" type="button" disabled={busy || working || !segments[index + 1]}
+                  onClick={() => moveImageAcrossText(index, "down")}>사진 아래로</button>
+                <button className="button button-light" type="button" disabled={busy || working} onClick={() => removeImage(index)}>사진 삭제</button>
+              </div>
+            </div>}
+          </Fragment>;
+        })}
+      </div>
+      {photoError && <p role="alert">{photoError}</p>}
       <button
         className="button button-dark"
-        disabled={busy || !topic || title.trim().length < 2 || body.trim().length < 3}
+        disabled={busy || working || !topic || title.trim().length < 2 || (!images.length && body.length < 3)}
       >
-        {busy ? "저장 중" : "저장하기"}
+        {busy || working ? "처리 중" : "저장하기"}
       </button>
     </form>,
   );

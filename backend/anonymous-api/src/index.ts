@@ -22,8 +22,8 @@ const actions = new Set([
   "poll_comment.delete",
 ]);
 const allowed: Record<string, string[]> = {
-  "post.create": ["title", "body", "topic", "prefix_id", "body_size", "body_color"],
-  "post.update": ["id", "title", "body", "topic", "prefix_id", "body_size", "body_color"],
+  "post.create": ["title", "body", "topic", "prefix_id", "body_size", "body_color", "images"],
+  "post.update": ["id", "title", "body", "topic", "prefix_id", "body_size", "body_color", "images"],
   "post.delete": ["id"],
   "comment.create": ["post_id", "body", "parent_id"],
   "comment.update": ["id", "body"],
@@ -132,11 +132,9 @@ export async function handleRequest(
     return reply(400, "GGO_INVALID_INPUT");
   const data = input.data as Record<string, unknown>;
   if (
-    Object.keys(data).some(
-      (key) => !allowed[input.action as string].includes(key),
-    ) ||
-    Object.values(data).some(
-      (value) => typeof value !== "string" && value !== null,
+    Object.entries(data).some(
+      ([key, value]) => !allowed[input.action as string].includes(key) ||
+        (key === "images" ? !Array.isArray(value) : typeof value !== "string" && value !== null),
     )
   )
     return reply(400, "GGO_INVALID_INPUT");

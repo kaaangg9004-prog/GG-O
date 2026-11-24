@@ -14,6 +14,7 @@ export interface AnonymousPost {
   body: string;
   body_size?: "small" | "normal" | "large" | "extra-large" | null;
   body_color?: string | null;
+  images?: CommunityPostImage[];
   image_path: string;
   topic: string;
   prefix?: CommunityPrefix | null;
@@ -29,6 +30,11 @@ export interface AnonymousPost {
   comment_count: number;
   is_mine: boolean;
   author_label: string;
+}
+export interface CommunityPostImage {
+  path: string;
+  offset: number;
+  width: number;
 }
 export interface AnonymousComment {
   id: string;
@@ -75,7 +81,7 @@ export interface AnonymousGateway {
   ): Promise<AnonymousComment[]>;
   write(
     action: string,
-    data: Record<string, string | null>,
+    data: Record<string, string | CommunityPostImage[] | null>,
   ): Promise<{ id: string }>;
   report(kind: AnonymousTarget, id: string, reason: string): Promise<void>;
   reports(offset?: number): Promise<AnonymousReport[]>;
