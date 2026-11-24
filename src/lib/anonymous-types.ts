@@ -1,4 +1,5 @@
-import type { CommunityFilter, SiteSettings } from "./community";
+import type { SiteSettings } from "./community";
+import type { CommunityBoard, CommunityPrefix } from "./community-boards";
 export interface AnonymousAccess {
   writing_enabled?: boolean;
   signed_in: boolean;
@@ -13,6 +14,10 @@ export interface AnonymousPost {
   body: string;
   image_path: string;
   topic: string;
+  prefix?: CommunityPrefix | null;
+  notice?: boolean;
+  notice_color?: string | null;
+  pin_rank?: number | null;
   tags: string[];
   created_at: string;
   updated_at: string;
@@ -51,8 +56,10 @@ export interface AnonymousReport {
 export type AdminAction = "suspend_7d" | "ban" | "delete" | "dismiss";
 export interface AnonymousGateway {
   settings?(): Promise<SiteSettings>;
+  boards?(): Promise<CommunityBoard[]>;
+  highlights?(board: string): Promise<AnonymousPost[]>;
   feed?(
-    filter: CommunityFilter,
+    filter: string,
     before?: { created_at: string; id: string },
     query?: string,
   ): Promise<AnonymousPost[]>;
