@@ -24,7 +24,7 @@ export function parseMagazine(value: unknown): MagazineArticle | null {
     !v.paragraphs.length ||
     v.paragraphs.length > 20 ||
     v.paragraphs.some(
-      (p) => typeof p !== "string" || p.length < 1 || p.length > 5000,
+      (p) => typeof p !== "string" || p.length < 1 || p.length > 10000,
     )
   )
     return null;

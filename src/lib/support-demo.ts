@@ -88,7 +88,7 @@ export function demoSupportGateway(current:()=>SupportMember):SupportGateway {
       const record=findTicket(id),{key,payload}=await unlockAdmin(record),now=new Date().toISOString();
       if(record.ticket.status==='answered')throw new Error('이미 답변 완료된 문의입니다.');
       payload.replies.push({id:crypto.randomUUID(),authorId:'GG-O 운영자',body:body.trim(),createdAt:now});
-      const next={...record,ticket:{...record.ticket,status:'in_progress' as const,updatedAt:now},content:await seal(key,new TextEncoder().encode(JSON.stringify(payload)))};
+      const next={...record,ticket:{...record.ticket,status:'answered' as const,updatedAt:now},content:await seal(key,new TextEncoder().encode(JSON.stringify(payload)))};
       saveTickets(allTickets().map(r=>r.ticket.id===id?next:r));unlocked.set(id,payload);
     },
     async complete(id) {

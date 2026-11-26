@@ -305,9 +305,26 @@ test('board management preserves old posts and guards metadata changes on the se
     await adminCall(admin, 'reply_support_ticket', [ticket,'가상 답변입니다.']);
     assert.equal(await supportStatus(), 'in_progress');
     await assert.rejects(complete(admin), /본인이 작성한 문의만/);
-    await complete(member);
-    await complete(member);
+    const closeOnReply = files.find(file => file.endsWith('_close_support_on_reply.sql'));
+    assert.ok(closeOnReply);
+    await db.exec(readFileSync(new URL(closeOnReply, directory), 'utf8'));
     assert.equal(await supportStatus(), 'answered');
+    await db.query("update public.support_tickets set status='waiting' where id=$1", [ticket]);
+    await assert.rejects(adminCall(member, 'reply_support_ticket', [ticket,'가상 답변입니다.']), /운영자만/);
+    assert.equal(await supportStatus(), 'waiting');
+    await adminCall(admin, 'reply_support_ticket', [ticket,'새 가상 답변입니다.']);
+    assert.equal(await supportStatus(), 'answered');
+    for (const suffix of ['_brand_introduction.sql','_long_form_content.sql','_localize_community_prefixes.sql']) {
+      const migration = files.find(file => file.endsWith(suffix));
+      assert.ok(migration);
+      await db.exec(readFileSync(new URL(migration, directory), 'utf8'));
+    }
+    const longBody = '가'.repeat(8000);
+    await db.query('update public.posts set caption=$1 where id=$2', [longBody,post.id]);
+    assert.equal((await read('anonymous_post', [post.id])).body, longBody);
+    await adminCall(admin,'community_board_manage',['prefix.save', {board:'자유', label:'일정', label_vi:'Lịch', label_en:'Schedule', color:'#9fcaf5'}]);
+    const boards = await adminCall(admin,'community_board_catalog',[true]);
+    assert.equal(boards.find(board=>board.name==='자유').prefixes.find(prefix=>prefix.label==='일정').labels.vi,'Lịch');
   } finally {
     await db.close();
   }

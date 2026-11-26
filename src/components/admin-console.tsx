@@ -12,6 +12,7 @@ import {
 import { boardCategories } from "@/lib/types";
 import { loadCommunityBoards } from "@/lib/community-boards";
 import type { LocalState } from "@/lib/types";
+import {BrandIntroductionEditor} from "./brand-introduction";
 import { HOT_TITLE, hotEligible, parseSiteSettings } from "@/lib/community";
 import type { SiteSettings } from "@/lib/community";
 import type {
@@ -508,6 +509,7 @@ export function AdminConsole({
               }}
             />
           )}
+          {section === "settings" && !demo && <BrandIntroductionEditor />}
           {["polls", "events", "journal", "support", "emergency", "boards"].includes(
             section,
           ) && panels[section]}

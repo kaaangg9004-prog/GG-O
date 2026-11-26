@@ -180,10 +180,12 @@ export function CommunityBoardAdmin() {
           const form = event.currentTarget;
           const fields = new FormData(form);
           const label = String(fields.get("label") ?? "").trim();
-          if (label) void act("prefix.save", { board: board.name, label, color: fields.get("color") })
+          if (label) void act("prefix.save", { board: board.name, label, color: fields.get("color"), label_vi: fields.get("label_vi"), label_en: fields.get("label_en") })
             .then(() => form.reset()).catch(() => {});
         }}>
-          <label>새 말머리<input name="label" maxLength={24} required /></label>
+          <label>새 말머리 (한국어)<input name="label" maxLength={24} required /></label>
+          <label>Tiếng Việt<input name="label_vi" maxLength={60} /></label>
+          <label>English<input name="label_en" maxLength={60} /></label>
           <TitleColorPalette color="#9fcaf5" label="말머리 색상" />
           <button className="button button-dark" disabled={busy}>말머리 추가</button>
         </form>
@@ -192,10 +194,13 @@ export function CommunityBoardAdmin() {
           className="board-admin-prefix"
           onSubmit={event => {
             event.preventDefault();
-            submit("prefix.save", { board: board.name, label: prefix.label, color: new FormData(event.currentTarget).get("color") });
+            submit("prefix.save", { board: board.name, label: prefix.label, ...Object.fromEntries(new FormData(event.currentTarget)) });
           }}
         >
           <span><span className="community-title-prefix" style={{ color: `color-mix(in srgb, ${prefix.color} 60%, #161616)` }}>[{prefix.label}]</span>글제목{prefix.active ? "" : " (사용 중지)"}</span>
+          <label>한국어<input name="label_ko" maxLength={24} defaultValue={prefix.labels?.ko ?? prefix.label} /></label>
+          <label>Tiếng Việt<input name="label_vi" maxLength={60} defaultValue={prefix.labels?.vi} /></label>
+          <label>English<input name="label_en" maxLength={60} defaultValue={prefix.labels?.en} /></label>
           <TitleColorPalette color={prefix.color} label={prefix.label + " 말머리 색상"} />
           <button className="button button-light" disabled={busy}>{prefix.active ? "색상 저장" : "다시 사용"}</button>
           {prefix.active && <button type="button" className="button button-light" disabled={busy} onClick={() => {

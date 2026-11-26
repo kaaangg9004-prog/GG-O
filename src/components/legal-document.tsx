@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import korean from "@/lib/locales/legal-ko.json";
 import vietnamese from "@/lib/locales/legal-vi.json";
 import english from "@/lib/locales/legal-en.json";
+import {PublishedBrandIntroduction} from "./brand-introduction";
 import { Logo } from "./ui";
 import { EmergencyPrivacyNotice } from "./emergency-privacy-notice";
 import { InformationLinks } from "./information-links";
@@ -107,7 +108,7 @@ export function LegalPage({ kind }: { kind: InformationKind }) {
         )}
         {kind === "about" ? (
           <article className="legal-document">
-            <DocumentBody kind={kind} />
+            <PublishedBrandIntroduction fallback={<DocumentBody kind={kind} />} />
           </article>
         ) : (
           <LegalDocument kind={kind} />

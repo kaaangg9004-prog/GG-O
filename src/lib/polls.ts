@@ -31,7 +31,7 @@ export function parsePoll(value:unknown):PollDefinition|null {
   if(new Set(questions.map(q=>q.id)).size!==questions.length)return null;
   for(const block of value.blocks){
     if(!object(block)||!identifier(block.id))return null;
-    if((block.type==='heading'||block.type==='text')&&text(block.text,block.type==='heading'?200:5000,1))blocks.push({id:block.id,type:block.type,text:block.text.trim()});
+    if((block.type==='heading'||block.type==='text')&&text(block.text,block.type==='heading'?200:10000,1))blocks.push({id:block.id,type:block.type,text:block.text.trim()});
     else if(block.type==='image'&&safePollImage(block.image)&&text(block.caption,300))blocks.push({id:block.id,type:'image',image:block.image,caption:block.caption.trim()});else return null;
   }
   if(new Set(blocks.map(block=>block.id)).size!==blocks.length||blocks.filter(block=>block.type==='image').length>6)return null;

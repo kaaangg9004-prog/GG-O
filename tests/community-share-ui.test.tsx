@@ -44,18 +44,19 @@ test("a shared post opens directly and its link can be copied", async () => {
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (value: string) => { copied = value; } } });
   const ui = render(<MemberBoard gateway={gateway} sharedPostId={id} />);
   try {
-    const dialog = within(await ui.findByRole("dialog"));
-    assert.ok(dialog.getByText("공유 시험 본문"));
-    assert.ok(dialog.getByText("운영자"));
-    fireEvent.click(dialog.getByRole("button", { name: "링크 복사" }));
-    await dialog.findByText("링크를 복사했습니다.");
+    const detail = within(await ui.findByRole("region", { name: "게시글" }));
+    assert.equal(ui.queryByRole("dialog"), null);
+    assert.ok(detail.getByText("공유 시험 본문"));
+    assert.ok(detail.getByText("운영자"));
+    fireEvent.click(detail.getByRole("button", { name: "링크 복사" }));
+    await detail.findByText("링크를 복사했습니다.");
     assert.equal(copied, `${window.location.origin}/?share=community&id=${id}`);
-    assert.equal((dialog.getByRole("textbox", { name: "게시글 주소" }) as HTMLInputElement).value, copied);
-    fireEvent.click(dialog.getByRole("button", { name: "공유하기" }));
-    assert.ok(dialog.getByRole("link", { name: "Facebook" }));
-    assert.ok(dialog.getByRole("link", { name: "X" }));
+    assert.equal((detail.getByRole("textbox", { name: "게시글 주소" }) as HTMLInputElement).value, copied);
+    fireEvent.click(detail.getByRole("button", { name: "공유하기" }));
+    assert.ok(detail.getByRole("link", { name: "Facebook" }));
+    assert.ok(detail.getByRole("link", { name: "X" }));
     for (const name of ["Facebook Messenger", "Instagram", "Instagram DM", "카카오톡", "Zalo"]) {
-      assert.ok(dialog.getByRole("button", { name }));
+      assert.ok(detail.getByRole("button", { name }));
     }
   } finally {
     ui.unmount();

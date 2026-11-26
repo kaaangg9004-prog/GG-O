@@ -6,7 +6,7 @@ import {SupportBoard} from '../src/components/support';
 import type {SupportGateway,SupportTicket} from '../src/lib/support-types';
 import {LocaleProvider} from '../src/components/locale-provider';
 
-test('opening a support ticket preserves its queue and only owner satisfaction completes it',async()=>{
+test('opening a support ticket preserves its queue and saving a reply completes it',async()=>{
   let operator=true;
   let status:SupportTicket['status']='waiting';
   const ticket=()=>({id:'qa-ticket',ownerId:'owner',authorId:'회원',title:'문의 시험',category:'일반 문의' as const,status,createdAt:'2026-11-24T00:00:00Z',updatedAt:'2026-11-24T00:00:00Z'});
@@ -15,7 +15,7 @@ test('opening a support ticket preserves its queue and only owner satisfaction c
     mode:'server',access:async()=>({isAdmin:operator}),list:async()=>[ticket()],
     open:async()=>({ticket:ticket(),body:'가상 문의 본문',replies:[]}),
     create:async()=>ticket().id,member:async()=>member(),
-    reply:async()=>{status='in_progress';},
+    reply:async()=>{status='answered';},
     complete:async()=>{status='answered';},
   };
   try{
@@ -26,11 +26,11 @@ test('opening a support ticket preserves its queue and only owner satisfaction c
     assert.equal(status,'waiting');
     fireEvent.change(dialog.getByLabelText('운영자 답변 작성'),{target:{value:'가상 답변'}});
     fireEvent.click(dialog.getByRole('button',{name:'답변 등록'}));
-    await dialog.findByText('답변 중');
+    await dialog.findByText('답변 완료');
     assert.equal(dialog.queryByRole('button',{name:'만족'}),null);
     fireEvent.click(dialog.getByRole('button',{name:'닫기'}));
     await ui.findByText('새로운 문의가 없습니다.');
-    fireEvent.click(within(ui.getByRole('group',{name:'문의 상태'})).getByRole('button',{name:/답변 중/}));
+    fireEvent.click(within(ui.getByRole('group',{name:'문의 상태'})).getByRole('button',{name:/답변 완료/}));
     await ui.findByRole('button',{name:'문의 시험'});
     cleanup();
     operator=false;
@@ -39,7 +39,7 @@ test('opening a support ticket preserves its queue and only owner satisfaction c
     const form=ui.getByRole('dialog').querySelector('form')!;
     fireEvent.change(form.querySelector('input')!,{target:{value:'fixture123'}});
     fireEvent.submit(form);
-    fireEvent.click(await ui.findByRole('button',{name:'Hài lòng'}));
+    assert.equal(ui.queryByRole('button',{name:'Hài lòng'}),null);
     await waitFor(()=>assert.equal(status,'answered'));
     await within(ui.getByRole('dialog')).findByText('Đã phản hồi');
   }finally{cleanup();localStorage.clear();}

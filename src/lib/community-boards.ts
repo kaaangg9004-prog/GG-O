@@ -3,6 +3,7 @@ import { getSupabase } from "./supabase-service";
 export interface CommunityPrefix {
   id: string;
   label: string;
+  labels?: Partial<Record<"ko" | "vi" | "en", string>>;
   color: string;
   active?: boolean;
 }

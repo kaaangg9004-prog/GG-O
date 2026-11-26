@@ -38,6 +38,7 @@ import { highlightHashtags } from "@/lib/community-hashtags";
 import { readProductPhoto } from "@/lib/product-images";
 import { dateLabel } from "@/lib/data";
 import { useLocalized } from "./locale-provider";
+import { contentShareRoute, contentShareUrl } from "@/lib/content-share-link";
 import { EmptyState, Modal } from "./ui";
 const guest: AnonymousAccess = {
   signed_in: false,
@@ -252,13 +253,32 @@ export function MemberBoard({
       setAccess(await gateway.access());
     }
   };
+  const readingRequest = useRef<string | null>(null);
   const openPost = (id: string) => {
+    const previous = window.history.state?.communityReading;
+    const ids: string[] = selected && Array.isArray(previous?.ids) ? previous.ids : shown.map(post => post.id);
+    window.history.replaceState({ ...window.history.state, communityScroll: window.scrollY }, "");
+    window.history.pushState({ ...window.history.state, communityScroll: 0, communityReading: { ids } }, "", contentShareUrl(window.location.origin, "community", id));
+    readingRequest.current = id;
     setPendingRead(id);
+    window.scrollTo({ top: 0 });
   };
   useEffect(() => {
-    setPendingRead(sharedPostId ?? null);
-    if (!sharedPostId) setSelected(null);
+    readingRequest.current = sharedPostId ?? null;
+    setPendingRead(readingRequest.current);
+    setSelected(null);
   }, [sharedPostId]);
+  useEffect(() => {
+    const restore = () => {
+      const id = new URLSearchParams(contentShareRoute(window.location).split("?")[1]).get("id");
+      readingRequest.current = id;
+      setSelected(null);
+      setPendingRead(id);
+      if (!id) requestAnimationFrame(() => window.scrollTo(0, window.history.state?.communityScroll ?? 0));
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
   useEffect(() => {
     if (!pendingRead || !gateway) return;
     const generation = epoch.current;
@@ -266,6 +286,7 @@ export function MemberBoard({
     void run(async () => {
       const opened = await gateway.post(pendingRead);
       if (generation !== epoch.current) return;
+      if (readingRequest.current !== pendingRead) return;
       setSelected(opened);
       await refresh();
     });
@@ -306,6 +327,10 @@ export function MemberBoard({
         .toLocaleLowerCase()
         .includes(query.trim().toLocaleLowerCase()),
     );
+  const readingIds: string[] = selected && typeof window !== "undefined" && Array.isArray(window.history.state?.communityReading?.ids) ? window.history.state.communityReading.ids : [];
+  const readingIndex = selected ? readingIds.indexOf(selected.id) : -1;
+  const neighbors = readingIndex < 0 ? [] : readingIds.slice(Math.max(0, readingIndex - 2), readingIndex + 3).filter(id => id !== selected?.id).map(id => shown.find(post => post.id === id)).filter(post => post !== undefined);
+
   return localize(
     <section className="member-board anonymous-board">
       {!compact&&<div className="board-notice">
@@ -361,6 +386,7 @@ export function MemberBoard({
           {error}
         </p>
       )}
+      <div hidden={!!selected}>
       {filter === "hot" ? (
         <TopPosts
           posts={(compact ? shown.slice(0, 5) : shown).map((p) => ({
@@ -451,8 +477,9 @@ export function MemberBoard({
           더 보기
         </button>
       )}
+      </div>
       {selected && gateway && (
-        <Modal title="게시글" wide close={() => setSelected(null)}>
+        <section className="community-reading-page" aria-label="게시글">
           <article className="board-detail">
             <p className="eyebrow" translate="no">{boardLabel(selected.topic)}</p>
             <h1 translate="no"><CommunityPostTitle post={translatedPost(selected)} /></h1>
@@ -490,6 +517,7 @@ export function MemberBoard({
               id={selected.id}
               onRequireAuth={onRequireAuth}
             />
+            {neighbors.length > 0 && <nav aria-label="앞뒤 게시글"><ul>{neighbors.map(post => <li key={post.id}><a href={contentShareUrl(window.location.origin, "community", post.id)} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); openPost(post.id); } }} translate="no">{translatedPost(post).title}</a></li>)}</ul></nav>}
             <AnonymousThread
               onActivity={() => void refresh().catch(() => {})}
               key={selected.id}
@@ -500,7 +528,7 @@ export function MemberBoard({
               onRequireAuth={onRequireAuth}
             />
           </article>
-        </Modal>
+        </section>
       )}
       {editing !== undefined && gateway && (
         <Modal
@@ -644,7 +672,12 @@ function communityTitlePrefix(post: AnonymousPost, locale: "ko" | "vi" | "en" = 
   if (post.notice || post.prefix?.label === "공지") {
     return { ko: "공지", vi: "Thông báo", en: "Notice" }[locale];
   }
-  return post.prefix?.label;
+  return post.prefix ? localizedPrefix(post.prefix, locale) : undefined;
+}
+function localizedPrefix(prefix: NonNullable<AnonymousPost["prefix"]>, locale: "ko" | "vi" | "en") {
+  const defaults = {공지: ["Notice", "Thông báo"], 정보: ["Information", "Thông tin"], 핫템: ["Hot picks", "Món đồ nổi bật"], 사진: ["Photo", "Ảnh"]};
+  const translation = defaults[prefix.label as keyof typeof defaults];
+  return prefix.labels?.[locale] ?? (locale !== "ko" && translation ? translation[locale === "en" ? 0 : 1] : prefix.label);
 }
 function communityTitleColor(post: AnonymousPost) {
   return post.notice ? post.notice_color ?? "#c23147" : post.prefix?.color;
@@ -863,7 +896,7 @@ function PostEditor({
         말머리
         <select value={prefix} onChange={event => setPrefix(event.target.value)}>
           <option value="">말머리 없음</option>
-          {choices.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+          {choices.map(item => <option key={item.id} value={item.id}>{localizedPrefix(item, localize.locale)}</option>)}
         </select>
       </label>
       <label>
@@ -897,7 +930,7 @@ function PostEditor({
               event.target.value = "";
               if (file) void insertImage(file);
             }} />
-          <span>본문에 커서를 놓고 첨부하세요. 영상은 MP4·WebM, 파일당 20MB까지입니다. {images.length}/{maxCommunityImages}</span>
+          <span>{localize.text("본문에 커서를 놓고 첨부하세요. 영상은 MP4·WebM, 파일당 20MB까지입니다.")}{" "}{images.length}/{maxCommunityImages}</span>
         </div>
         {segments.map((part, index) => {
           const image = images[index];
@@ -915,7 +948,7 @@ function PostEditor({
                   const text = event.target.value;
                   setSegments(current => current.map((value, i) => i === index ? text : value));
                 }}
-                maxLength={Math.max(part.length, 3000 - (rawBody.length - part.length))} rows={images.length ? 4 : 10} />
+                maxLength={Math.max(part.length, 10000 - (rawBody.length - part.length))} rows={images.length ? 4 : 10} />
             </label>
             {image && <div className="community-editor-image">
               {source && <PostAttachment source={source} video={video} width={image.width} index={index} />}
