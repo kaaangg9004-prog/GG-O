@@ -258,7 +258,7 @@ export function MemberBoard({
     const previous = window.history.state?.communityReading;
     const ids: string[] = selected && Array.isArray(previous?.ids) ? previous.ids : shown.map(post => post.id);
     window.history.replaceState({ ...window.history.state, communityScroll: window.scrollY }, "");
-    window.history.pushState({ ...window.history.state, communityScroll: 0, communityReading: { ids } }, "", contentShareUrl(window.location.origin, "community", id));
+    window.history.pushState({ ...window.history.state, communityScroll: 0, communityReading: { ids, filter: selected ? previous?.filter ?? selected.topic : filter, query: selected ? previous?.query ?? "" : query } }, "", contentShareUrl(window.location.origin, "community", id));
     readingRequest.current = id;
     setPendingRead(id);
     window.scrollTo({ top: 0 });
@@ -327,9 +327,53 @@ export function MemberBoard({
         .toLocaleLowerCase()
         .includes(query.trim().toLocaleLowerCase()),
     );
-  const readingIds: string[] = selected && typeof window !== "undefined" && Array.isArray(window.history.state?.communityReading?.ids) ? window.history.state.communityReading.ids : [];
+  const reading = selected && typeof window !== "undefined" ? window.history.state?.communityReading : null;
+  const readingIds: string[] = Array.isArray(reading?.ids) ? reading.ids : [];
   const readingIndex = selected ? readingIds.indexOf(selected.id) : -1;
-  const neighbors = readingIndex < 0 ? [] : readingIds.slice(Math.max(0, readingIndex - 2), readingIndex + 3).filter(id => id !== selected?.id).map(id => shown.find(post => post.id === id)).filter(post => post !== undefined);
+  const nearbyIds = readingIndex < 0 ? [] : readingIds.slice(Math.max(0, readingIndex - 2), readingIndex + 3);
+  const [nearby, setNearby] = useState<{id: string; posts: AnonymousPost[]} | null>(null);
+  const selectedId = selected?.id;
+  const readingFilter = reading?.filter ?? selected?.topic;
+  const readingQuery = reading?.query ?? "";
+  useEffect(() => {
+    if (!selectedId || !readingFilter || !gateway?.feed) return;
+    let active = true;
+    const load = async () => {
+      const pinned = !readingQuery && readingFilter !== "hot" && readingFilter !== "전체"
+        ? await gateway.highlights?.(readingFilter) ?? [] : [];
+      const posts = [...pinned];
+      const seen = new Set(posts.map(post => post.id));
+      let before: {created_at: string; id: string} | undefined;
+      while (active) {
+        const page = await gateway.feed!(readingFilter, before, readingQuery);
+        for (const post of page) {
+          if (!seen.has(post.id)) { seen.add(post.id); posts.push(post); }
+        }
+        const index = posts.findIndex(post => post.id === selectedId);
+        const last = page.at(-1);
+        if ((index >= 0 && posts.length > index + 2) || page.length < 30 || !last || last.id === before?.id) {
+          if (active) setNearby({id: selectedId, posts: index < 0 ? [] : posts.slice(Math.max(0, index - 2), index + 3)});
+          return;
+        }
+        before = {created_at: last.created_at, id: last.id};
+      }
+    };
+    void load().catch(() => {});
+    return () => {active = false;};
+  }, [selectedId, readingFilter, readingQuery, gateway]);
+  const localNeighbors = nearbyIds.map(id => shown.find(post => post.id === id)).filter(post => post !== undefined);
+  const neighbors = (nearby?.id === selectedId && nearby ? nearby.posts : localNeighbors).filter(post => post.id !== selectedId);
+
+  const browseCategory = (category: string) => {
+    setFilter(category);
+    if (!readingRequest.current && !selected) return;
+    readingRequest.current = null;
+    setPendingRead(null);
+    setSelected(null);
+    setQuery("");
+    window.history.pushState({communityScroll: 0}, "", "/#community");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
 
   return localize(
     <section className="member-board anonymous-board">
@@ -351,7 +395,7 @@ export function MemberBoard({
       {!compact && (
         <CommunityNavigation
           value={filter}
-          onChange={setFilter}
+          onChange={browseCategory}
           settings={settings}
           categories={["전체", ...categories]}
           categoryLabel={boardLabel}

@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {getSupabase} from "@/lib/supabase-service";
 import {readProductPhoto} from "@/lib/product-images";
 import type {Locale} from "@/lib/i18n";
@@ -39,7 +39,9 @@ export function PublishedBrandIntroduction({fallback}: {fallback: React.ReactNod
 export function BrandIntroductionEditor() {
   const localize = useLocalized();
   const [locale, setLocale] = useState<Locale>(localize.locale);
-  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [body, setBody] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
+  const editor = useRef<HTMLTextAreaElement>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -49,19 +51,18 @@ export function BrandIntroductionEditor() {
     setStatus("");
     void read(locale).then(saved => {
       if (!active) return;
-      setBlocks(saved ?? defaults[locale].about.split("\n\n").map(text => ({text})));
+      const images: string[] = [];
+      const text = saved?.map(block => "text" in block ? block.text : `[[${images.push(block.image)}]]`).join("\n\n");
+      setBody(text ?? defaults[locale].about);
+      setPhotos(images);
       setReady(true);
     }).catch(() => {if (active) setStatus("브랜드 소개를 불러오지 못했습니다.");});
     return () => { active = false; };
   }, [locale]);
 
-  function move(index: number, direction: number) {
-    const next = [...blocks];
-    [next[index], next[index + direction]] = [next[index + direction], next[index]];
-    setBlocks(next);
-  }
-
   async function addPhoto(file: File) {
+    const start = editor.current?.selectionStart ?? body.length;
+    const end = editor.current?.selectionEnd ?? start;
     setBusy(true);
     setStatus("");
     try {
@@ -74,7 +75,8 @@ export function BrandIntroductionEditor() {
       const path = crypto.randomUUID() + ".webp";
       const {error} = await bucket.upload(path, blob, {contentType: blob.type});
       if (error) throw error;
-      setBlocks(current => [...current, {image: bucket.getPublicUrl(path).data.publicUrl}]);
+      setPhotos(current => [...current, bucket.getPublicUrl(path).data.publicUrl]);
+      setBody(current => current.slice(0, start) + `\n[[${photos.length + 1}]]\n` + current.slice(end));
     } catch {
       setStatus("사진을 올리지 못했습니다.");
     } finally { setBusy(false); }
@@ -86,25 +88,29 @@ export function BrandIntroductionEditor() {
       <option value="ko">한국어</option><option value="vi">Tiếng Việt</option><option value="en">English</option>
     </select></label>
     {ready && <fieldset disabled={busy}>
-      {blocks.map((block,index) => <div key={index}>
-        {"text" in block
-          ? <textarea aria-label="소개 문단" value={block.text} maxLength={10000} rows={5}
-              onChange={event => {const text = event.target.value; setBlocks(current => current.map((part, i) => i === index ? {text} : part));}}/>
-          : <img src={validImage.test(block.image) ? block.image : undefined} alt="" style={{maxWidth: "100%", maxHeight: 220}}/>}
-        <button type="button" disabled={index === 0} onClick={() => move(index,-1)}>위로</button>
-        <button type="button" disabled={index === blocks.length - 1} onClick={() => move(index,1)}>아래로</button>
-        <button type="button" onClick={() => setBlocks(current => current.filter((_,i) => i !== index))}>삭제</button>
-      </div>)}
-      <button type="button" disabled={blocks.length >= 30} onClick={() => setBlocks(current => [...current,{text:""}])}>본문 추가</button>
-      <label>사진 추가<input type="file" accept="image/jpeg,image/png,image/webp" disabled={blocks.length >= 30}
+      <label>브랜드 소개 본문
+        <textarea ref={editor} value={body} onChange={event => setBody(event.target.value)} rows={16} maxLength={30000} />
+      </label>
+      <label>사진 추가<input type="file" accept="image/jpeg,image/png,image/webp" disabled={photos.length >= 14}
         onChange={event => {const file = event.target.files?.[0]; event.target.value = ""; if (file) void addPhoto(file);}}/></label>
-      <button type="button" onClick={() => setBlocks([])}>내용 모두 지우기</button>
+      {photos.length > 0 && <div>
+        <p>본문의 사진 번호를 옮기거나 지워 사진 위치를 바꿀 수 있습니다.</p>
+        {photos.map((url, index) => validImage.test(url) && <figure key={index}>
+          <img src={url} alt="" style={{maxWidth: "100%", maxHeight: 100}}/><figcaption>[[{index + 1}]]</figcaption>
+        </figure>)}
+      </div>}
+      <button type="button" onClick={() => {setBody(""); setPhotos([]);}}>내용 모두 지우기</button>
       <button type="button" onClick={async () => {
         setBusy(true);
         setStatus("");
         try {
           const client = getSupabase();
           if (!client) throw new Error();
+          const blocks: Block[] = body.split(/(\[\[\d+\]\])/g).flatMap((part): Block[] => {
+            const match = /^\[\[(\d+)\]\]$/.exec(part);
+            const image = match ? photos[Number(match[1]) - 1] : undefined;
+            return image ? [{image}] : part.trim() ? [{text: part.trim()}] : [];
+          });
           const {error} = await client.from("brand_introductions").upsert({locale, blocks});
           if (error) throw error;
           setStatus("브랜드 소개를 저장했습니다.");

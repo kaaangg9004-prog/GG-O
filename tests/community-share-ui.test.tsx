@@ -64,3 +64,25 @@ test("a shared post opens directly and its link can be copied", async () => {
     else Reflect.deleteProperty(navigator, "clipboard");
   }
 });
+
+test("a directly opened post shows nearby board titles and category click returns to the list", async () => {
+  const posts = Array.from({length:5}, (_,i): AnonymousPost => ({
+    id: `a0000000-0000-4000-8000-00000000000${i+1}`, title: `이웃 글 ${i+1}`, body: "본문",
+    topic: "자유", image_path: "", tags: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    comment_count: 0, is_mine: false, author_label: "익명",
+  }));
+  const gateway = {
+    boards: async () => [{name:"자유",position:0,active:true,prefixes:[]}],
+    feed: async () => posts, post: async (id: string) => posts.find(post => post.id === id),
+    comments: async () => [],
+    access: async () => ({ signed_in: false, can_write: false, is_admin: false, status: "guest", suspended_until: null }),
+  } as unknown as AnonymousGateway;
+  const ui = render(<MemberBoard gateway={gateway} initialFilter="자유" sharedPostId={posts[2].id} />);
+  try {
+    const neighbors = within(await ui.findByRole("navigation", {name:"앞뒤 게시글"}));
+    assert.deepEqual(neighbors.getAllByRole("link").map(link=>link.textContent), ["이웃 글 1","이웃 글 2","이웃 글 4","이웃 글 5"]);
+    fireEvent.click(ui.getByRole("button",{name:"자유",exact:true}));
+    assert.equal(ui.queryByRole("region",{name:"게시글"}),null);
+    assert.ok(await ui.findByRole("button",{name:/이웃 글 3/}));
+  } finally { ui.unmount(); window.history.replaceState(null,"","/"); }
+});
