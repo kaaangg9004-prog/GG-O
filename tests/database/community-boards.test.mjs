@@ -325,6 +325,16 @@ test('board management preserves old posts and guards metadata changes on the se
     await adminCall(admin,'community_board_manage',['prefix.save', {board:'자유', label:'일정', label_vi:'Lịch', label_en:'Schedule', color:'#9fcaf5'}]);
     const boards = await adminCall(admin,'community_board_catalog',[true]);
     assert.equal(boards.find(board=>board.name==='자유').prefixes.find(prefix=>prefix.label==='일정').labels.vi,'Lịch');
+    const visual = files.find(file => file.endsWith("_site_visual_editor.sql"));
+    await db.exec(readFileSync(new URL(visual, directory), "utf8"));
+    await db.query("update ggo_private.visual_site set approval_hash=extensions.crypt($1, extensions.gen_salt('bf', 4))", ["fixture-approval"]);
+    const draft = {text: {"ko.home.title": "시험 제목"}};
+    await assert.rejects(adminCall(member, "visual_site_publish", [0,draft,"fixture-approval"]), /GGO_ADMIN_REQUIRED/);
+    assert.equal(await adminCall(admin, "visual_site_publish", [0,draft,"incorrect"]), "password");
+    assert.deepEqual(await read("visual_site_published", []), {revision:0,document:{}});
+    assert.equal(await adminCall(admin, "visual_site_publish", [0,draft,"fixture-approval"]), "ok");
+    assert.equal(await adminCall(admin, "visual_site_publish", [0,{},"fixture-approval"]), "conflict");
+    assert.deepEqual(await read("visual_site_published", []), {revision:1,document:draft});
   } finally {
     await db.close();
   }
