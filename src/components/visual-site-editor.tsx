@@ -2,6 +2,8 @@
 
 import {useEffect, useRef, useState} from "react";
 import type {CSSProperties, PointerEvent as ReactPointerEvent} from "react";
+import {VisualHomeControls} from "./visual-home-widgets";
+import type {HomeLayout, WidgetId} from "./visual-home-widgets";
 import {getSupabase} from "@/lib/supabase-service";
 import {readProductPhoto} from "@/lib/product-images";
 
@@ -12,6 +14,7 @@ export type VisualPage = {background?: Background; banners?: Banner[]};
 export type VisualDocument = {
   text?: Record<string, string>;
   menu?: string[];
+  home?: HomeLayout;
   links?: {id:string; label:string; href:string}[];
   pages?: Record<string, VisualPage>;
 };
@@ -79,11 +82,15 @@ export function VisualBanners({page, editing, position}: {
       ><img src={banner.image} alt="배너"/></a>)}</>;
 }
 
-export function VisualEditor({document, setDocument, revision, view, navigate, menu, pages, labels, close, published}: {
+export function VisualEditor({document, setDocument, revision, view, navigate, menu, pages, labels, widget, selectWidget, close, published}: {
   document: VisualDocument; setDocument: (value: VisualDocument) => void; revision: number;
   view: string; navigate: (view: string) => void; pages: {id: string; label: string}[]; menu: {id: string; label: string}[];
+  widget: WidgetId; selectWidget: (id:WidgetId)=>void;
   labels: {key: string; label: string; fallback: string}[]; close: () => void; published: (value: Published) => void;
 }) {
+  const [tab,setTab]=useState<"home"|"copy"|"page">("home");
+  useEffect(()=>{if(view==="home")setTab("home");},[view,widget]);
+  const [widgetUploading,setWidgetUploading]=useState(false);
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -133,11 +140,17 @@ export function VisualEditor({document, setDocument, revision, view, navigate, m
     finally {if(password.current)password.current.value="";setBusy(false);}
   };
   return <aside className="visual-site-editor" aria-label="페이지 편집">
-    <header><strong>페이지 편집 · 관리자 미리보기</strong>
-      <button className="button button-dark" disabled={busy} onClick={()=>{setStatus("");setStep(1);}}>저장</button>
-      <button className="button button-light" disabled={busy} onClick={close}>편집 닫기</button>
+    <header><div><strong>페이지 편집</strong><span>관리자 미리보기</span></div>
+      <button className="button button-dark" disabled={busy||widgetUploading} onClick={()=>{setStatus("");setStep(1);}}>저장</button>
+      <button className="button button-light" disabled={busy||widgetUploading} onClick={close}>편집 닫기</button>
     </header>
-    <details open><summary>화면 문구와 메뉴</summary>
+    <nav className="visual-editor-tabs" aria-label="편집 도구">
+      <button aria-pressed={tab==="home"} disabled={busy||widgetUploading} onClick={()=>{setTab("home");if(view!=="home")navigate("home");}}>홈 위젯</button>
+      <button aria-pressed={tab==="copy"} disabled={busy||widgetUploading} onClick={()=>setTab("copy")}>문구·메뉴</button>
+      <button aria-pressed={tab==="page"} disabled={busy||widgetUploading} onClick={()=>setTab("page")}>배너·배경</button>
+    </nav>
+    {tab==="home"&&<VisualHomeControls layout={document.home} change={home=>setDocument({...document,home})} selected={widget} select={selectWidget} setUploading={setWidgetUploading}/>}
+    {tab==="copy"&&<div className="visual-editor-options">
       {labels.map(item=><label key={item.key}>{item.label}<input maxLength={240} value={visualText(document,item.key,item.fallback)}
         onChange={event=>setDocument({...document,text:{...document.text,[item.key]:event.target.value}})}/></label>)}
       {ordered.map((item,index)=><div key={item.id} draggable onDragStart={event=>event.dataTransfer.setData("text/plain",item.id)}
@@ -150,8 +163,8 @@ export function VisualEditor({document, setDocument, revision, view, navigate, m
       <label>새 메뉴 이름<input maxLength={50} value={linkLabel} onChange={event=>setLinkLabel(event.target.value)}/></label>
       <label>새 메뉴 주소<input value={linkUrl} onChange={event=>setLinkUrl(event.target.value)}/></label>
       <button disabled={!linkLabel.trim()||visualHref(linkUrl)==="#"||(document.links?.length??0)>=4} onClick={()=>{setDocument({...document,links:[...(document.links??[]),{id:crypto.randomUUID(),label:linkLabel.trim(),href:visualHref(linkUrl)}]});setLinkLabel("");}}>메뉴 추가</button>
-    </details>
-    <details><summary>페이지별 배경과 배너</summary>
+    </div>}
+    {tab==="page"&&<div className="visual-editor-options">
       <label>편집할 페이지<select value={view} onChange={event=>navigate(event.target.value)}>{pages.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       <label>배경색<input type="color" value={background.color} onChange={event=>changePage({...page,background:{...background,color:event.target.value}})}/></label>
       <label>배경 이미지<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event=>{const file=event.target.files?.[0];if(file)void upload(file,"background");}}/></label>
@@ -175,7 +188,7 @@ export function VisualEditor({document, setDocument, revision, view, navigate, m
       <label>이동 주소<input value={href} onChange={event=>setHref(event.target.value)}/></label>
       <label>배너 이미지<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy||(page.banners?.length??0)>=8} onChange={event=>{const file=event.target.files?.[0];if(file)void upload(file,"banner");}}/></label>
       {page.banners?.map((item,index)=><div key={item.id}><label>배너 {index+1} 이동 주소<input value={item.href} onChange={event=>changePage({...page,banners:page.banners!.map(banner=>banner.id===item.id?{...banner,href:event.target.value}:banner)})}/></label><button onClick={()=>changePage({...page,banners:page.banners!.filter(banner=>banner.id!==item.id)})}>배너 제거</button></div>)}
-    </details>
+    </div>}
     {step>0&&<section role="dialog" aria-modal="true" aria-label="공개 승인" className="visual-approval">
       {step===1?<><strong>저장하시겠습니까?</strong><button onClick={()=>setStep(2)}>예</button></>:
         <form onSubmit={event=>{event.preventDefault();void submit();}}><label>승인 비밀번호<input ref={password} type="password" autoComplete="off" maxLength={72} required autoFocus/></label><button disabled={busy}>확인</button></form>}
