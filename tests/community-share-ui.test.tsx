@@ -81,7 +81,7 @@ test("a directly opened post shows nearby board titles and category click return
   try {
     const neighbors = within(await ui.findByRole("navigation", {name:"앞뒤 게시글"}));
     assert.deepEqual(neighbors.getAllByRole("link").map(link=>link.textContent), ["이웃 글 1","이웃 글 2","이웃 글 4","이웃 글 5"]);
-    fireEvent.click(ui.getByRole("button",{name:"자유",exact:true}));
+    fireEvent.click(ui.getByRole("button",{name:"자유"}));
     assert.equal(ui.queryByRole("region",{name:"게시글"}),null);
     assert.ok(await ui.findByRole("button",{name:/이웃 글 3/}));
   } finally { ui.unmount(); window.history.replaceState(null,"","/"); }

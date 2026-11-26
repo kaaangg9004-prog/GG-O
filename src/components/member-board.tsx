@@ -274,7 +274,8 @@ export function MemberBoard({
       readingRequest.current = id;
       setSelected(null);
       setPendingRead(id);
-      if (!id) requestAnimationFrame(() => window.scrollTo(0, window.history.state?.communityScroll ?? 0));
+      const scroll = window.history.state?.communityScroll ?? 0;
+      if (!id && scroll !== window.scrollY) window.requestAnimationFrame(() => window.scrollTo(0, scroll));
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
@@ -372,7 +373,7 @@ export function MemberBoard({
     setSelected(null);
     setQuery("");
     window.history.pushState({communityScroll: 0}, "", "/#community");
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    window.dispatchEvent(new window.PopStateEvent("popstate"));
   };
 
   return localize(
