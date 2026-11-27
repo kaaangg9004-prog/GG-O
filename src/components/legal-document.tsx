@@ -108,7 +108,6 @@ export function LegalPage({ kind }: { kind: InformationKind }) {
         )}
         {kind === "about" ? (
           <article className="legal-document">
-            <p className="information-copy" translate="no">GG-O · GGO · 지지오</p>
             <PublishedBrandIntroduction fallback={<DocumentBody kind={kind} />} />
           </article>
         ) : (

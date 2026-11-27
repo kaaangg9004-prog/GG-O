@@ -5,7 +5,7 @@ const previewTitle = 'GG-O · Văn hóa Hàn và gu của bạn';
 const previewDescription = '문화와 일상, 즐거움을 나누는 익명 커뮤니티';
 
 export const metadata: Metadata = {
-  title: 'GG-O (지지오) | 한국과 베트남의 취향이 만나는 놀이터',
+  title: 'GG-O | 한국과 베트남의 취향이 만나는 놀이터',
   alternates: { canonical: 'https://www.gg-o.net/' },
   description: previewDescription,
   robots: { index: (process.env.VERCEL_ENV ?? process.env.NODE_ENV) === 'production', follow: true },
@@ -16,4 +16,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function Page() { return <DemoAccess />; }
+const siteName = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  url: 'https://www.gg-o.net/',
+  name: 'GG-O',
+  alternateName: ['GGO', '지지오'],
+};
+
+export default function Page() {
+  return <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteName) }} />
+    <DemoAccess />
+  </>;
+}
