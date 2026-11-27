@@ -6,7 +6,7 @@ import {LanguageSwitcher} from '@/components/language-switcher';
 
 const googleVerification = process.env.GGO_GOOGLE_SITE_VERIFICATION?.trim()
   || 'lqVJttjgAcdwg7MwganzpSY8_jdD7HAdCUv3kjpP7Fs';
-const naverVerification = process.env.GGO_NAVER_SITE_VERIFICATION?.trim();
+const naverVerification = process.env.GGO_NAVER_SITE_VERIFICATION?.trim() || '161f49b663444bbf14bbb2aab389b876432f716a';
 
 export const metadata: Metadata = {
   title: 'GG-O · Văn hóa Hàn và gu của bạn',
